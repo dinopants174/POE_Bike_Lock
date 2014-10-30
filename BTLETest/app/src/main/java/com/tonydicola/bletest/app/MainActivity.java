@@ -167,6 +167,14 @@ public class MainActivity extends Activity {
         // The first one with the UART service will be chosen--see the code in the scanCallback.
         writeLine("Scanning for devices...");
         adapter.startLeScan(scanCallback);
+        if (!set_timer){
+            read_rssi_task = new TimerTask() {
+                @Override
+                public void run() {
+                    gatt.readRemoteRssi();
+                }
+            };
+        }
     }
 
     // OnStop, called right before the activity loses foreground focus.  Close the BTLE connection.

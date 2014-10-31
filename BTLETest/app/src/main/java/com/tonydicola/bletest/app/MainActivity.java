@@ -84,6 +84,7 @@ public class MainActivity extends Activity {
                     return;
                 }
                 tx.setValue(rssi_string.getBytes(Charset.forName("UTF-8")));
+                gatt.writeCharacteristic(tx);
             }
         }
 

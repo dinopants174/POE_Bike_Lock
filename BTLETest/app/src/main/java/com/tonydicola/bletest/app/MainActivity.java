@@ -36,15 +36,17 @@ public class MainActivity extends Activity {
     Timer timer;
     Boolean set_timer;
     TimerTask read_rssi_task;
+
     // UI elements
-    private TextView messages;
-    private EditText input;
+    private TextView rssi_text_view;
 
     // BTLE state
     private BluetoothAdapter adapter;
     private BluetoothGatt gatt;
     private BluetoothGattCharacteristic tx;
     private BluetoothGattCharacteristic rx;
+
+    String rssi_string;
 
     // Main BTLE device callback where much of the logic occurs.
     private BluetoothGattCallback callback = new BluetoothGattCallback() {
@@ -54,7 +56,6 @@ public class MainActivity extends Activity {
             super.onConnectionStateChange(gatt, status, newState);
             if (newState == BluetoothGatt.STATE_CONNECTED) {
                 MainActivity.this.gatt = gatt;
-                writeLine("Connected!");
                 // Discover services.
                 // schedule readRemoteRssi here
                 timer = new Timer();
@@ -62,16 +63,13 @@ public class MainActivity extends Activity {
                 timer.schedule(read_rssi_task, 0, 1000);
                 set_timer = true;
                 if (!gatt.discoverServices()) {
-                    writeLine("Failed to start discovering services!");
                 }
             } else if (newState == BluetoothGatt.STATE_DISCONNECTED) {
-                writeLine("Disconnected!");
                 //destroy Timer
                 if (set_timer) {
                     timer.cancel();
                 }
             } else {
-                writeLine("Connection state changed.  New state: " + newState);
             }
         }
 
@@ -79,6 +77,13 @@ public class MainActivity extends Activity {
         public void onReadRemoteRssi(BluetoothGatt gatt, int rssi, int status) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 Log.i("RSSI Callback", String.format("BluetoothGatt ReadRssi[%d]", rssi));
+                rssi_string = "" + rssi;
+                writeRSSI(rssi_string);
+                if (tx == null || rssi_string == null) {
+                    // Do nothing if there is no device or message to send.
+                    return;
+                }
+                tx.setValue(rssi_string.getBytes(Charset.forName("UTF-8")));
             }
         }
 
@@ -91,9 +96,7 @@ public class MainActivity extends Activity {
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             super.onServicesDiscovered(gatt, status);
             if (status == BluetoothGatt.GATT_SUCCESS) {
-                writeLine("Service discovery completed!");
             } else {
-                writeLine("Service discovery failed with status: " + status);
             }
             // Save reference to each characteristic.
             tx = gatt.getService(UART_UUID).getCharacteristic(TX_UUID);
@@ -101,17 +104,14 @@ public class MainActivity extends Activity {
             // Setup notifications on RX characteristic changes (i.e. data received).
             // First call setCharacteristicNotification to enable notification.
             if (!gatt.setCharacteristicNotification(rx, true)) {
-                writeLine("Couldn't set notifications for RX characteristic!");
             }
             // Next update the RX characteristic's client descriptor to enable notifications.
             if (rx.getDescriptor(CLIENT_UUID) != null) {
                 BluetoothGattDescriptor desc = rx.getDescriptor(CLIENT_UUID);
                 desc.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
                 if (!gatt.writeDescriptor(desc)) {
-                    writeLine("Couldn't write RX client descriptor value!");
                 }
             } else {
-                writeLine("Couldn't get RX client descriptor!");
             }
         }
 
@@ -119,7 +119,6 @@ public class MainActivity extends Activity {
         @Override
         public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
             super.onCharacteristicChanged(gatt, characteristic);
-            writeLine("Received: " + characteristic.getStringValue(0));
         }
     };
 
@@ -135,8 +134,8 @@ public class MainActivity extends Activity {
                 gatt.readRemoteRssi();
             }
         };
-        messages = (TextView) findViewById(R.id.messages);
-        input = (EditText) findViewById(R.id.input);
+        rssi_text_view = (TextView) findViewById(R.id.rssi_text);
+
 
         adapter = BluetoothAdapter.getDefaultAdapter();
         //create Timer here
@@ -146,12 +145,10 @@ public class MainActivity extends Activity {
         // Called when a device is found.
         @Override
         public void onLeScan(BluetoothDevice bluetoothDevice, int i, byte[] bytes) {
-            writeLine("Found device: " + bluetoothDevice.getAddress());
             // Check if the device has the UART service.
             if (parseUUIDs(bytes).contains(UART_UUID)) {
                 // Found a device, stop the scan.
                 adapter.stopLeScan(scanCallback);
-                writeLine("Found UART service!");
                 // Connect to the device.
                 // Control flow will now go to the callback functions when BTLE events occur.
                 gatt = bluetoothDevice.connectGatt(getApplicationContext(), false, callback);
@@ -165,7 +162,6 @@ public class MainActivity extends Activity {
         super.onResume();
         // Scan for all BTLE devices.
         // The first one with the UART service will be chosen--see the code in the scanCallback.
-        writeLine("Scanning for devices...");
         adapter.startLeScan(scanCallback);
     }
 
@@ -187,31 +183,11 @@ public class MainActivity extends Activity {
         }
     }
 
-    // Handler for mouse click on the send button.
-    public void sendClick(View view) {
-        String message = input.getText().toString();
-        if (tx == null || message == null || message.isEmpty()) {
-            // Do nothing if there is no device or message to send.
-            return;
-        }
-        // Update TX characteristic value.  Note the setValue overload that takes a byte array must be used.
-        tx.setValue(message.getBytes(Charset.forName("UTF-8")));
-        if (gatt.writeCharacteristic(tx)) {
-            writeLine("Sent: " + message);
-        } else {
-            writeLine("Couldn't write TX characteristic!");
-        }
-    }
-
-    // Write some text to the messages text view.
-    // Care is taken to do this on the main UI thread so writeLine can be called
-    // from any thread (like the BTLE callback).
-    private void writeLine(final CharSequence text) {
+    private void writeRSSI(final CharSequence text) {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                messages.append(text);
-                messages.append("\n");
+                rssi_text_view.setText(text);
             }
         });
     }
@@ -290,6 +266,4 @@ public class MainActivity extends Activity {
         }
         return super.onOptionsItemSelected(item);
     }
-
-
 }

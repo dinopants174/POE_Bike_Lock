@@ -13,6 +13,7 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 
@@ -37,8 +38,12 @@ public class MainActivity extends Activity {
     Boolean set_timer;
     TimerTask read_rssi_task;
 
+
     // UI elements
     private TextView rssi_text_view;
+    private Button b1;
+    private Button b2;
+
 
     // BTLE state
     private BluetoothAdapter adapter;
@@ -47,6 +52,8 @@ public class MainActivity extends Activity {
     private BluetoothGattCharacteristic rx;
 
     String rssi_string;
+    String unlock_command = "u";
+    String lock_command = "l";
 
     // Main BTLE device callback where much of the logic occurs.
     private BluetoothGattCallback callback = new BluetoothGattCallback() {
@@ -129,6 +136,7 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         // Grab references to UI elements.
+
         read_rssi_task = new TimerTask() {
             @Override
             public void run() {
@@ -137,10 +145,31 @@ public class MainActivity extends Activity {
         };
         rssi_text_view = (TextView) findViewById(R.id.rssi_text);
 
+        b1 = (Button) findViewById(R.id.unlock_button);
+        b2 = (Button) findViewById(R.id.lock_button);
+
+        b1.setOnClickListener(myhandler1);
+        b2.setOnClickListener(myhandler2);
+
 
         adapter = BluetoothAdapter.getDefaultAdapter();
+
         //create Timer here
     }    // BTLE device scanning callback.
+
+    View.OnClickListener myhandler1 = new View.OnClickListener(){
+        public void onClick(View v){
+            tx.setValue(unlock_command.getBytes(Charset.forName("UTF-8")));
+            gatt.writeCharacteristic(tx);
+        }
+    };
+
+    View.OnClickListener myhandler2 = new View.OnClickListener(){
+        public void onClick(View v){
+            tx.setValue(lock_command.getBytes(Charset.forName("UTF-8")));
+            gatt.writeCharacteristic(tx);
+        }
+    };
 
     private LeScanCallback scanCallback = new LeScanCallback() {
         // Called when a device is found.
@@ -161,6 +190,11 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+
+        timer = new Timer();
+
+        timer.schedule(read_rssi_task, 0, 1000);
+        set_timer = true;
         // Scan for all BTLE devices.
         // The first one with the UART service will be chosen--see the code in the scanCallback.
         adapter.startLeScan(scanCallback);

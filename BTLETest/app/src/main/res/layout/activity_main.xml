@@ -21,7 +21,7 @@
         android:layout_height="@dimen/button_max_height"
 
 
-        android:background="@drawable/lockIcon"
+        android:background="@drawable/lock_icon"
         android:scaleType="fitCenter"
         android:layout_below="@+id/rssi_text"
         android:layout_centerHorizontal="true"
@@ -32,7 +32,7 @@
         android:layout_width="@dimen/button_max_width"
         android:layout_height="@dimen/button_max_height"
 
-        android:background="@drawable/unlockIcon"
+        android:background="@drawable/unlock_icon"
         android:scaleType="fitCenter"
         android:layout_below="@+id/lock_button"
         android:layout_alignStart="@+id/lock_button"

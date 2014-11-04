@@ -8,6 +8,7 @@ import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattDescriptor;
+import android.media.Image;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
@@ -15,6 +16,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.TextView;
 
 import java.nio.ByteBuffer;
@@ -41,8 +43,8 @@ public class MainActivity extends Activity {
 
     // UI elements
     private TextView rssi_text_view;
-    private Button b1;
-    private Button b2;
+    private ImageButton b1;
+    private ImageButton b2;
 
 
     // BTLE state
@@ -69,14 +71,12 @@ public class MainActivity extends Activity {
 
                 timer.schedule(read_rssi_task, 0, 1000);
                 set_timer = true;
-                if (!gatt.discoverServices()) {
-                }
+
             } else if (newState == BluetoothGatt.STATE_DISCONNECTED) {
                 //destroy Timer
                 if (set_timer) {
                     timer.cancel();
                 }
-            } else {
             }
         }
 
@@ -103,23 +103,15 @@ public class MainActivity extends Activity {
         @Override
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             super.onServicesDiscovered(gatt, status);
-            if (status == BluetoothGatt.GATT_SUCCESS) {
-            } else {
-            }
             // Save reference to each characteristic.
             tx = gatt.getService(UART_UUID).getCharacteristic(TX_UUID);
             rx = gatt.getService(UART_UUID).getCharacteristic(RX_UUID);
             // Setup notifications on RX characteristic changes (i.e. data received).
             // First call setCharacteristicNotification to enable notification.
-            if (!gatt.setCharacteristicNotification(rx, true)) {
-            }
             // Next update the RX characteristic's client descriptor to enable notifications.
             if (rx.getDescriptor(CLIENT_UUID) != null) {
                 BluetoothGattDescriptor desc = rx.getDescriptor(CLIENT_UUID);
                 desc.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
-                if (!gatt.writeDescriptor(desc)) {
-                }
-            } else {
             }
         }
 
@@ -145,8 +137,8 @@ public class MainActivity extends Activity {
         };
         rssi_text_view = (TextView) findViewById(R.id.rssi_text);
 
-        b1 = (Button) findViewById(R.id.unlock_button);
-        b2 = (Button) findViewById(R.id.lock_button);
+        b1 = (ImageButton) findViewById(R.id.unlock_button);
+        b2 = (ImageButton) findViewById(R.id.lock_button);
 
         b1.setOnClickListener(myhandler1);
         b2.setOnClickListener(myhandler2);

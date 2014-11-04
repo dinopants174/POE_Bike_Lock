@@ -71,6 +71,7 @@ public class MainActivity extends Activity {
 
                 timer.schedule(read_rssi_task, 0, 1000);
                 set_timer = true;
+                gatt.discoverServices();
 
             } else if (newState == BluetoothGatt.STATE_DISCONNECTED) {
                 //destroy Timer
@@ -86,10 +87,12 @@ public class MainActivity extends Activity {
                 Log.i("RSSI Callback", String.format("BluetoothGatt ReadRssi[%d]", rssi));
                 rssi_string = "" + rssi;
                 writeRSSI(rssi_string);
-                if (tx == null || rssi_string == null) {
+                if (tx == null) {
                     // Do nothing if there is no device or message to send.
+                    Log.i("RSSI Callback", "TX is empty");
                     return;
                 }
+                Log.i("RSSI Callback","sending");
                 tx.setValue(rssi_string.getBytes(Charset.forName("UTF-8")));
                 gatt.writeCharacteristic(tx);
             }
@@ -108,10 +111,12 @@ public class MainActivity extends Activity {
             rx = gatt.getService(UART_UUID).getCharacteristic(RX_UUID);
             // Setup notifications on RX characteristic changes (i.e. data received).
             // First call setCharacteristicNotification to enable notification.
+            gatt.setCharacteristicNotification(rx, true);
             // Next update the RX characteristic's client descriptor to enable notifications.
             if (rx.getDescriptor(CLIENT_UUID) != null) {
                 BluetoothGattDescriptor desc = rx.getDescriptor(CLIENT_UUID);
                 desc.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+                gatt.writeDescriptor(desc);
             }
         }
 
@@ -151,15 +156,21 @@ public class MainActivity extends Activity {
 
     View.OnClickListener myhandler1 = new View.OnClickListener(){
         public void onClick(View v){
-            tx.setValue(unlock_command.getBytes(Charset.forName("UTF-8")));
-            gatt.writeCharacteristic(tx);
+            Log.i("clicks","unlock pressed");
+            if(tx != null) {
+                tx.setValue(unlock_command.getBytes(Charset.forName("UTF-8")));
+                gatt.writeCharacteristic(tx);
+            }
         }
     };
 
     View.OnClickListener myhandler2 = new View.OnClickListener(){
         public void onClick(View v){
-            tx.setValue(lock_command.getBytes(Charset.forName("UTF-8")));
-            gatt.writeCharacteristic(tx);
+            Log.i("clicks","unlock pressed");
+            if(tx != null) {
+                tx.setValue(lock_command.getBytes(Charset.forName("UTF-8")));
+                gatt.writeCharacteristic(tx);
+            }
         }
     };
 
@@ -183,12 +194,13 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
 
-        timer = new Timer();
+        /*timer = new Timer();
 
         timer.schedule(read_rssi_task, 0, 1000);
         set_timer = true;
         // Scan for all BTLE devices.
         // The first one with the UART service will be chosen--see the code in the scanCallback.
+        */
         adapter.startLeScan(scanCallback);
     }
 

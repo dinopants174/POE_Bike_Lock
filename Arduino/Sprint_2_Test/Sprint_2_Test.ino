@@ -29,7 +29,11 @@ Adafruit_BLE_UART BTLEserial = Adafruit_BLE_UART(ADAFRUITBLE_REQ, ADAFRUITBLE_RD
 
 Servo servo;
 int pos = 0;
-String command_str = "";
+int desired_pos = 55;  //change this depending on where servo needs to go for unlock command
+String phone_str = "";
+const int rssi_unlock_val = -40;  //change this depending on rssi signal
+const int rssi_lock_val = -90;    //change this depending on rssi signal
+
 /**************************************************************************/
 /*!
     Configure the Arduino and start advertising with the radio
@@ -87,13 +91,13 @@ void loop()
       //char c = BTLEserial.read();
       //Serial.print(c);
       
-      command_str = BTLEserial.readString();
+      phone_str = BTLEserial.readString();
       
-      if (command_str == "u"){
+      if (phone_str == "u" || phone_str.toInt() <=  rssi_unlock_val){
         Serial.println("I am unlocking now");
-        pos = 55;
+        pos = desired_pos;
       }
-      else if (command_str == "l"){
+      else if (phone_str == "l" || phone_str.toInt() >= rssi_lock_val){
         Serial.println("TROLOLOL LOCKING FOREVER KTHX BYE");
         pos = 0;
       }

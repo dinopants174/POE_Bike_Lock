@@ -8,15 +8,9 @@ import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattDescriptor;
-import android.media.Image;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.Menu;
-import android.view.MenuItem;
 import android.view.View;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.ToggleButton;
 
@@ -38,7 +32,7 @@ public class MainActivity extends Activity {
     // UUID for the BTLE client characteristic which is necessary for notifications.
     public static UUID CLIENT_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
     Timer timer;
-    Boolean set_timer;
+    Boolean set_timer = true;
     TimerTask read_rssi_task;
 
 
@@ -67,6 +61,7 @@ public class MainActivity extends Activity {
             if (newState == BluetoothGatt.STATE_CONNECTED) {
                 MainActivity.this.gatt = gatt;
                 // Discover services.
+                Log.i("ble Connect", "Connected");
                 // schedule readRemoteRssi here
                 if(set_timer) {
                     timer = new Timer();
@@ -78,10 +73,13 @@ public class MainActivity extends Activity {
 
             } else if (newState == BluetoothGatt.STATE_DISCONNECTED) {
                 //destroy Timer
-                    if(timer != null) {
+                Log.i("ble Connect", "Disconnected");
+                if(timer != null) {
                         timer.cancel();
                         set_timer = false;
                     }
+                Log.i("ble Connect", "Scanning");
+                adapter.startLeScan(scanCallback);
             }
         }
 
@@ -89,7 +87,7 @@ public class MainActivity extends Activity {
         public void onReadRemoteRssi(BluetoothGatt gatt, int rssi, int status) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 Log.i("RSSI Callback", String.format("BluetoothGatt ReadRssi[%d]", rssi));
-                rssi_string = "" + rssi;
+                rssi_string = "" + rssi + ";";
                 writeRSSI(rssi_string);
                 if (tx == null) {
                     // Do nothing if there is no device or message to send.
@@ -157,16 +155,17 @@ public class MainActivity extends Activity {
 
         lock_toggle = (ToggleButton) findViewById(R.id.lock_state);
 
-        lock_toggle.setOnClickListener(toggle_hander);
+        lock_toggle.setOnClickListener(toggle_handler);
         lock_toggle.setChecked(true);
 
 
         adapter = BluetoothAdapter.getDefaultAdapter();
+        Log.i("ble Connect", "Scanning");
+        adapter.startLeScan(scanCallback);
 
-        //create Timer here
-    }    // BTLE device scanning callback.
+    }
 
-    View.OnClickListener toggle_hander = new View.OnClickListener(){
+    View.OnClickListener toggle_handler = new View.OnClickListener(){
         public void onClick(View v){
             Log.i("toggle","toggle pressed");
             boolean locked = lock_toggle.isChecked();
@@ -194,6 +193,7 @@ public class MainActivity extends Activity {
             if (parseUUIDs(bytes).contains(UART_UUID)) {
                 // Found a device, stop the scan.
                 adapter.stopLeScan(scanCallback);
+                Log.i("ble Connect", "Found Device");
                 // Connect to the device.
                 // Control flow will now go to the callback functions when BTLE events occur.
                 gatt = bluetoothDevice.connectGatt(getApplicationContext(), false, callback);
@@ -213,6 +213,7 @@ public class MainActivity extends Activity {
         // Scan for all BTLE devices.
         // The first one with the UART service will be chosen--see the code in the scanCallback.
         */
+        Log.i("ble Connect", "Scanning");
         adapter.startLeScan(scanCallback);
     }
 
@@ -227,7 +228,7 @@ public class MainActivity extends Activity {
             gatt = null;
             tx = null;
             rx = null;
-            if (set_timer) {
+            if (set_timer && timer != null) {
                 timer.cancel();
                 set_timer = false;
             }

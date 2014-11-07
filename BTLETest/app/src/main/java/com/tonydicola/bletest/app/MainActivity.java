@@ -31,7 +31,7 @@ public class MainActivity extends Activity {
     public static UUID RX_UUID = UUID.fromString("6E400003-B5A3-F393-E0A9-E50E24DCCA9E");
     // UUID for the BTLE client characteristic which is necessary for notifications.
     public static UUID CLIENT_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
-    Timer timer;
+    Timer timer = new Timer();
     Boolean set_timer = true;
     TimerTask read_rssi_task;
 
@@ -64,10 +64,8 @@ public class MainActivity extends Activity {
                 Log.i("ble Connect", "Connected");
                 // schedule readRemoteRssi here
                 if(set_timer) {
-                    timer = new Timer();
-
                     timer.schedule(read_rssi_task, 0, 1000);
-                    set_timer = true;
+                    set_timer = false;
                     gatt.discoverServices();
                 }
 
@@ -76,7 +74,8 @@ public class MainActivity extends Activity {
                 Log.i("ble Connect", "Disconnected");
                 if(timer != null) {
                         timer.cancel();
-                        set_timer = false;
+                        timer.purge();
+                        set_timer = true;
                     }
                 Log.i("ble Connect", "Scanning");
                 adapter.startLeScan(scanCallback);
@@ -196,7 +195,7 @@ public class MainActivity extends Activity {
                 Log.i("ble Connect", "Found Device");
                 // Connect to the device.
                 // Control flow will now go to the callback functions when BTLE events occur.
-                gatt = bluetoothDevice.connectGatt(getApplicationContext(), false, callback);
+                gatt = bluetoothDevice.connectGatt(getApplicationContext(), true, callback);
             }
         }
     };
@@ -213,9 +212,7 @@ public class MainActivity extends Activity {
         // Scan for all BTLE devices.
         // The first one with the UART service will be chosen--see the code in the scanCallback.
         */
-        Log.i("ble Connect", "Scanning");
-        adapter.startLeScan(scanCallback);
-    }
+        }
 
     // OnStop, called right before the activity loses foreground focus.  Close the BTLE connection.
     @Override

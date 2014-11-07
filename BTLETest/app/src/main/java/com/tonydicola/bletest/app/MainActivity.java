@@ -18,6 +18,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.TextView;
+import android.widget.ToggleButton;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -43,8 +44,7 @@ public class MainActivity extends Activity {
 
     // UI elements
     private TextView rssi_text_view;
-    private ImageButton b1;
-    private ImageButton b2;
+    private ToggleButton lock_toggle;
 
 
     // BTLE state
@@ -57,6 +57,7 @@ public class MainActivity extends Activity {
     String unlock_command = "u";
     String lock_command = "l";
 
+
     // Main BTLE device callback where much of the logic occurs.
     private BluetoothGattCallback callback = new BluetoothGattCallback() {
         // Called whenever the device connection state changes, i.e. from disconnected to connected.
@@ -67,17 +68,20 @@ public class MainActivity extends Activity {
                 MainActivity.this.gatt = gatt;
                 // Discover services.
                 // schedule readRemoteRssi here
-                timer = new Timer();
+                if(set_timer) {
+                    timer = new Timer();
 
-                timer.schedule(read_rssi_task, 0, 1000);
-                set_timer = true;
-                gatt.discoverServices();
+                    timer.schedule(read_rssi_task, 0, 1000);
+                    set_timer = true;
+                    gatt.discoverServices();
+                }
 
             } else if (newState == BluetoothGatt.STATE_DISCONNECTED) {
                 //destroy Timer
-                if (set_timer) {
-                    timer.cancel();
-                }
+                    if(timer != null) {
+                        timer.cancel();
+                        set_timer = false;
+                    }
             }
         }
 
@@ -124,6 +128,15 @@ public class MainActivity extends Activity {
         @Override
         public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
             super.onCharacteristicChanged(gatt, characteristic);
+            String lock_state = characteristic.getStringValue(0);
+
+            if(lock_state.equals("l")){
+                toggleLock(true);
+            }
+            else{
+                toggleLock(false);
+            }
+
         }
     };
 
@@ -142,11 +155,10 @@ public class MainActivity extends Activity {
         };
         rssi_text_view = (TextView) findViewById(R.id.rssi_text);
 
-        b1 = (ImageButton) findViewById(R.id.unlock_button);
-        b2 = (ImageButton) findViewById(R.id.lock_button);
+        lock_toggle = (ToggleButton) findViewById(R.id.lock_state);
 
-        b1.setOnClickListener(myhandler1);
-        b2.setOnClickListener(myhandler2);
+        lock_toggle.setOnClickListener(toggle_hander);
+        lock_toggle.setChecked(true);
 
 
         adapter = BluetoothAdapter.getDefaultAdapter();
@@ -154,21 +166,21 @@ public class MainActivity extends Activity {
         //create Timer here
     }    // BTLE device scanning callback.
 
-    View.OnClickListener myhandler1 = new View.OnClickListener(){
+    View.OnClickListener toggle_hander = new View.OnClickListener(){
         public void onClick(View v){
-            Log.i("clicks","unlock pressed");
-            if(tx != null) {
-                tx.setValue(unlock_command.getBytes(Charset.forName("UTF-8")));
-                gatt.writeCharacteristic(tx);
-            }
-        }
-    };
+            Log.i("toggle","toggle pressed");
+            boolean locked = lock_toggle.isChecked();
 
-    View.OnClickListener myhandler2 = new View.OnClickListener(){
-        public void onClick(View v){
-            Log.i("clicks","unlock pressed");
             if(tx != null) {
-                tx.setValue(lock_command.getBytes(Charset.forName("UTF-8")));
+                if(locked) {
+                    tx.setValue(lock_command.getBytes(Charset.forName("UTF-8")));
+                    Log.i("toggle", "sending lock");
+                }
+                else{
+                    tx.setValue(unlock_command.getBytes(Charset.forName("UTF-8")));
+                    Log.i("toggle", "sending unlock");
+
+                }
                 gatt.writeCharacteristic(tx);
             }
         }
@@ -231,6 +243,14 @@ public class MainActivity extends Activity {
         });
     }
 
+    private void toggleLock(final boolean locked){
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                lock_toggle.setChecked(locked);
+            }
+        });
+    }
     // Filtering by custom UUID is broken in Android 4.3 and 4.4, see:
     //   http://stackoverflow.com/questions/18019161/startlescan-with-128-bit-uuids-doesnt-work-on-native-android-ble-implementation?noredirect=1#comment27879874_18019161
     // This is a workaround function from the SO thread to manually parse advertisement data.
@@ -282,27 +302,5 @@ public class MainActivity extends Activity {
             }
         }
         return uuids;
-    }
-
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-
-        // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.main, menu);
-        return true;
-    }
-
-    // Boilerplate code from the activity creation:
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-        int id = item.getItemId();
-        if (id == R.id.action_settings) {
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
     }
 }

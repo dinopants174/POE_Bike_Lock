@@ -31,7 +31,7 @@ public class MainActivity extends Activity {
     public static UUID RX_UUID = UUID.fromString("6E400003-B5A3-F393-E0A9-E50E24DCCA9E");
     // UUID for the BTLE client characteristic which is necessary for notifications.
     public static UUID CLIENT_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
-    Timer timer = new Timer();
+    Timer timer;
     Boolean set_timer = true;
     TimerTask read_rssi_task;
 
@@ -64,6 +64,7 @@ public class MainActivity extends Activity {
                 Log.i("ble Connect", "Connected");
                 // schedule readRemoteRssi here
                 if(set_timer) {
+                    timer = new Timer();
                     timer.schedule(read_rssi_task, 0, 1000);
                     set_timer = false;
                     gatt.discoverServices();
@@ -200,24 +201,9 @@ public class MainActivity extends Activity {
         }
     };
 
-    // OnResume, called right before UI is displayed.  Start the BTLE connection.
     @Override
-    protected void onResume() {
-        super.onResume();
-
-        /*timer = new Timer();
-
-        timer.schedule(read_rssi_task, 0, 1000);
-        set_timer = true;
-        // Scan for all BTLE devices.
-        // The first one with the UART service will be chosen--see the code in the scanCallback.
-        */
-        }
-
-    // OnStop, called right before the activity loses foreground focus.  Close the BTLE connection.
-    @Override
-    protected void onStop() {
-        super.onStop();
+    protected void onDestroy() {
+        super.onDestroy();
         if (gatt != null) {
             // For better reliability be careful to disconnect and close the connection.
             gatt.disconnect();
@@ -227,7 +213,7 @@ public class MainActivity extends Activity {
             rx = null;
             if (set_timer && timer != null) {
                 timer.cancel();
-                set_timer = false;
+                set_timer = true;
             }
         }
     }

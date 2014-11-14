@@ -128,12 +128,12 @@ public class MainActivity extends Activity {
         public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
             super.onCharacteristicChanged(gatt, characteristic);
             String lock_state = characteristic.getStringValue(0);
-
-            if(lock_state.equals("l")){
-                toggleLock(true);
-            }
-            else{
-                toggleLock(false);
+            if (mode) {
+                if (lock_state.equals("l")) {
+                    toggleLock(true);
+                } else {
+                    toggleLock(false);
+                }
             }
 
         }

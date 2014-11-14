@@ -31,14 +31,15 @@ public class MainActivity extends Activity {
     public static UUID RX_UUID = UUID.fromString("6E400003-B5A3-F393-E0A9-E50E24DCCA9E");
     // UUID for the BTLE client characteristic which is necessary for notifications.
     public static UUID CLIENT_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
-    Timer timer;
-    Boolean set_timer = true;
-    TimerTask read_rssi_task;
-
+    private Timer timer;
+    private Boolean set_timer = true;
+    private TimerTask read_rssi_task;
+    private Boolean mode; //mode
 
     // UI elements
     private TextView rssi_text_view;
     private ToggleButton lock_toggle;
+    private ToggleButton mode_toggle; //for auto-mode on/off
 
 
     // BTLE state
@@ -85,7 +86,7 @@ public class MainActivity extends Activity {
 
         @Override
         public void onReadRemoteRssi(BluetoothGatt gatt, int rssi, int status) {
-            if (status == BluetoothGatt.GATT_SUCCESS) {
+            if (status == BluetoothGatt.GATT_SUCCESS && mode) { //mode condition added
                 Log.i("RSSI Callback", String.format("BluetoothGatt ReadRssi[%d]", rssi));
                 rssi_string = "" + rssi + ";";
                 writeRSSI(rssi_string);
@@ -154,10 +155,13 @@ public class MainActivity extends Activity {
         rssi_text_view = (TextView) findViewById(R.id.rssi_text);
 
         lock_toggle = (ToggleButton) findViewById(R.id.lock_state);
-
         lock_toggle.setOnClickListener(toggle_handler);
         lock_toggle.setChecked(true);
 
+        //for mode toggle button
+        mode_toggle = (ToggleButton) findViewById(R.id.mode_state);
+        mode_toggle.setOnClickListener(mode_toggle_handler);
+        mode_toggle.setChecked(true); //we probably save the mode last time to local drive.
 
         adapter = BluetoothAdapter.getDefaultAdapter();
         Log.i("ble Connect", "Scanning");
@@ -182,6 +186,13 @@ public class MainActivity extends Activity {
                 }
                 gatt.writeCharacteristic(tx);
             }
+        }
+    };
+
+    //on click listener for mode toggle button
+    View.OnClickListener mode_toggle_handler = new View.OnClickListener() {
+        public void onClick(View v) {
+            mode = mode_toggle.isChecked();
         }
     };
 

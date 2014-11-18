@@ -6,9 +6,10 @@
     android:paddingLeft="@dimen/activity_horizontal_margin"
     android:paddingRight="@dimen/activity_horizontal_margin"
     android:paddingTop="@dimen/activity_vertical_margin"
-    android:background="#d3d3d3"
-    tools:context="com.tonydicola.bletest.app.MainActivity">
+    android:background="#27bec4"
 
+    tools:context="com.tonydicola.bletest.app.MainActivity">
+<!--d70052-->
     <TextView
         android:id="@+id/rssi_text"
         android:layout_width="wrap_content"
@@ -23,17 +24,18 @@
         android:background="@drawable/toggle_selector"
         android:textOff=""
         android:textOn=""
-        android:layout_alignParentTop="true"
-        android:layout_alignStart="@+id/mode_state" />
+        android:layout_below="@+id/rssi_text"
+        android:layout_centerHorizontal="true" />
     <ToggleButton
         android:id="@+id/mode_state"
         android:layout_width="200dp"
-        android:layout_height="200dp"
+        android:layout_height="100dp"
         android:background="@drawable/mode_toggle"
         android:textOff=""
         android:textOn=""
         android:checked="false"
         android:layout_alignParentBottom="true"
-        android:layout_centerHorizontal="true" />
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="68dp" />
 
 </RelativeLayout>

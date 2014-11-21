@@ -8,9 +8,11 @@ import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattDescriptor;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.ToggleButton;
 
@@ -31,14 +33,16 @@ public class MainActivity extends Activity {
     public static UUID RX_UUID = UUID.fromString("6E400003-B5A3-F393-E0A9-E50E24DCCA9E");
     // UUID for the BTLE client characteristic which is necessary for notifications.
     public static UUID CLIENT_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
-    Timer timer;
-    Boolean set_timer = true;
-    TimerTask read_rssi_task;
-
+    private Timer timer;
+    private Boolean set_timer = true;
+    private TimerTask read_rssi_task;
+    private Boolean mode = true; //mode
 
     // UI elements
     private TextView rssi_text_view;
     private ToggleButton lock_toggle;
+    private ToggleButton mode_toggle; //for auto-mode on/off
+    private RelativeLayout layout;
 
 
     // BTLE state
@@ -50,13 +54,14 @@ public class MainActivity extends Activity {
     String rssi_string;
     String unlock_command = "u";
     String lock_command = "l";
+    String ble_state = "disconnected";
 
 
     // Main BTLE device callback where much of the logic occurs.
     private BluetoothGattCallback callback = new BluetoothGattCallback() {
         // Called whenever the device connection state changes, i.e. from disconnected to connected.
         @Override
-        public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+        public void onConnectionStateChange(final BluetoothGatt gatt, int status, int newState) {
             super.onConnectionStateChange(gatt, status, newState);
             if (newState == BluetoothGatt.STATE_CONNECTED) {
                 MainActivity.this.gatt = gatt;
@@ -64,16 +69,32 @@ public class MainActivity extends Activity {
                 Log.i("ble Connect", "Connected");
                 // schedule readRemoteRssi here
                 if(set_timer) {
+                    if(timer != null) {
+                        read_rssi_task.cancel();
+                        timer.cancel();
+                        timer.purge();
+                    }
+                    read_rssi_task = new TimerTask() {
+                        @Override
+                        public void run() {
+                            gatt.readRemoteRssi();
+                        }
+                    };
                     timer = new Timer();
                     timer.schedule(read_rssi_task, 0, 1000);
                     set_timer = false;
                     gatt.discoverServices();
+                ble_state = "connected";
+                changeColor(ble_state);
                 }
 
             } else if (newState == BluetoothGatt.STATE_DISCONNECTED) {
                 //destroy Timer
                 Log.i("ble Connect", "Disconnected");
+                ble_state = "disconnected";
+                changeColor(ble_state);
                 if(timer != null) {
+                        read_rssi_task.cancel();
                         timer.cancel();
                         timer.purge();
                         set_timer = true;
@@ -85,7 +106,7 @@ public class MainActivity extends Activity {
 
         @Override
         public void onReadRemoteRssi(BluetoothGatt gatt, int rssi, int status) {
-            if (status == BluetoothGatt.GATT_SUCCESS) {
+            if (status == BluetoothGatt.GATT_SUCCESS && mode) { //mode condition added
                 Log.i("RSSI Callback", String.format("BluetoothGatt ReadRssi[%d]", rssi));
                 rssi_string = "" + rssi + ";";
                 writeRSSI(rssi_string);
@@ -127,14 +148,13 @@ public class MainActivity extends Activity {
         public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
             super.onCharacteristicChanged(gatt, characteristic);
             String lock_state = characteristic.getStringValue(0);
-
-            if(lock_state.equals("l")){
+            Log.i("arduino in comms", lock_state);
+            if (lock_state.equals("l")) {
                 toggleLock(true);
             }
-            else{
+            else if(lock_state.equals("u")){
                 toggleLock(false);
             }
-
         }
     };
 
@@ -153,11 +173,18 @@ public class MainActivity extends Activity {
         };
         rssi_text_view = (TextView) findViewById(R.id.rssi_text);
 
+        layout = (RelativeLayout) findViewById(R.id.layout);
+        changeColor(ble_state);
         lock_toggle = (ToggleButton) findViewById(R.id.lock_state);
-
         lock_toggle.setOnClickListener(toggle_handler);
         lock_toggle.setChecked(true);
 
+        //for mode toggle button
+        mode_toggle = (ToggleButton) findViewById(R.id.mode_state);
+        mode_toggle.setOnClickListener(mode_toggle_handler);
+        mode_toggle.setChecked(true); //we probably save the mode last time to local drive.\
+
+        Log.i("test", "starting");
 
         adapter = BluetoothAdapter.getDefaultAdapter();
         Log.i("ble Connect", "Scanning");
@@ -185,6 +212,13 @@ public class MainActivity extends Activity {
         }
     };
 
+    //on click listener for mode toggle button
+    View.OnClickListener mode_toggle_handler = new View.OnClickListener() {
+        public void onClick(View v) {
+            mode = mode_toggle.isChecked();
+        }
+    };
+
     private LeScanCallback scanCallback = new LeScanCallback() {
         // Called when a device is found.
         @Override
@@ -194,6 +228,8 @@ public class MainActivity extends Activity {
                 // Found a device, stop the scan.
                 adapter.stopLeScan(scanCallback);
                 Log.i("ble Connect", "Found Device");
+                ble_state = "found";
+                changeColor(ble_state);
                 // Connect to the device.
                 // Control flow will now go to the callback functions when BTLE events occur.
                 gatt = bluetoothDevice.connectGatt(getApplicationContext(), true, callback);
@@ -211,7 +247,8 @@ public class MainActivity extends Activity {
             gatt = null;
             tx = null;
             rx = null;
-            if (set_timer && timer != null) {
+            if (timer != null) {
+                read_rssi_task.cancel();
                 timer.cancel();
                 set_timer = true;
             }
@@ -232,6 +269,23 @@ public class MainActivity extends Activity {
             @Override
             public void run() {
                 lock_toggle.setChecked(locked);
+            }
+        });
+    }
+
+    private void changeColor(final String state){
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if(state.equals("disconnected")) {
+                    layout.setBackgroundColor(Color.parseColor("#FFBBBB"));
+                }
+                else if(state.equals("found")) {
+                    layout.setBackgroundColor(Color.parseColor("#A2D39C"));
+                }
+                else if(state.equals("connected")) {
+                    layout.setBackgroundColor(Color.parseColor("#82CA9D"));
+                }
             }
         });
     }

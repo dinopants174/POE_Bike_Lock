@@ -1,6 +1,7 @@
 package com.tonydicola.bletest.app;
 
 import android.app.Activity;
+import android.appwidget.AppWidgetManager;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothAdapter.LeScanCallback;
 import android.bluetooth.BluetoothDevice;
@@ -8,6 +9,9 @@ import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattDescriptor;
+import android.content.ComponentName;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
@@ -110,6 +114,7 @@ public class MainActivity extends Activity {
                     Log.i("ble Connect", "Scanning");
                     adapter.startLeScan(scanCallback);
                 }
+                updateState();
             }
         }
 
@@ -164,6 +169,7 @@ public class MainActivity extends Activity {
                 } else if (lock_state.equals("u")) {
                     toggleLock(false);
                 }
+                updateState();
             }
             else{
                 Log.i("arduino in comms", characteristic.getUuid().toString());
@@ -196,7 +202,7 @@ public class MainActivity extends Activity {
         mode_toggle = (ToggleButton) findViewById(R.id.mode_state);
         mode_toggle.setOnClickListener(mode_toggle_handler);
         mode_toggle.setChecked(true); //we probably save the mode last time to local drive.\
-
+        updateState();
         Log.i("test", "starting");
 
         adapter = BluetoothAdapter.getDefaultAdapter();
@@ -205,11 +211,36 @@ public class MainActivity extends Activity {
 
     }
 
+    public void updateWidget() {
+        AppWidgetManager mgr = AppWidgetManager.getInstance(this);
+        Intent update = new Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
+        update.setClass(this,bletestapp.class);
+        update.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS,mgr.getAppWidgetIds(new ComponentName(this,bletestapp.class)));
+        this.sendBroadcast(update);
+        this.finish();
+    }
+
+    public void updateState() {
+        SharedPreferences pref =  this.getSharedPreferences("ble", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = pref.edit();
+        editor.putBoolean("mode",mode);
+        editor.putBoolean("lock_state",lock_toggle.isChecked());
+        editor.putString("ble_state",ble_state);
+        editor.commit();
+
+        Log.i("update","updated");
+        AppWidgetManager mgr = AppWidgetManager.getInstance(this);
+        Intent update = new Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
+        update.setClass(this,bletestapp.class);
+        update.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS,mgr.getAppWidgetIds(new ComponentName(this,bletestapp.class)));
+        this.sendBroadcast(update);
+    }
+
     View.OnClickListener toggle_handler = new View.OnClickListener(){
         public void onClick(View v){
             Log.i("toggle","toggle pressed");
             boolean locked = lock_toggle.isChecked();
-
+            updateState();
             if(tx != null) {
                 if(locked) {
                     tx.setValue(lock_command.getBytes(Charset.forName("UTF-8")));
@@ -229,6 +260,7 @@ public class MainActivity extends Activity {
     View.OnClickListener mode_toggle_handler = new View.OnClickListener() {
         public void onClick(View v) {
             mode = mode_toggle.isChecked();
+            updateState();
         }
     };
 

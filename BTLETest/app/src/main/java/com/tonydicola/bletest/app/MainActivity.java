@@ -156,7 +156,7 @@ public class MainActivity extends Activity {
         @Override
         public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
             super.onCharacteristicChanged(gatt, characteristic);
-            if (characteristic.getUuid().toString() == RX_UUID.toString()) {
+            if (characteristic.getUuid().equals(RX_UUID)) {
                 String lock_state = characteristic.getStringValue(0);
                 Log.i("arduino in comms", lock_state);
                 if (lock_state.equals("l")) {
@@ -291,7 +291,7 @@ public class MainActivity extends Activity {
             @Override
             public void run() {
                 if(state.equals("disconnected")) {
-                    layout.setBackgroundColor(Color.parseColor("#FFBBBB"));
+                    layout.setBackgroundColor(Color.parseColor("#EBEBEB"));
                 }
                 else if(state.equals("found")) {
                     layout.setBackgroundColor(Color.parseColor("#A2D39C"));

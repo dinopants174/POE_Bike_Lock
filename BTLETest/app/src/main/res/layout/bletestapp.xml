@@ -2,7 +2,7 @@
     android:layout_width="fill_parent"
     android:layout_height="fill_parent"
     android:orientation="vertical"
-    android:id="@+id/">
+    android:id="@+id/widget">
     <ImageView
         android:layout_width="140dp"
         android:layout_height="100dp"

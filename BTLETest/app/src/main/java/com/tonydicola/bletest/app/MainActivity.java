@@ -277,7 +277,10 @@ public class MainActivity extends Activity {
                 changeColor(ble_state);
                 // Connect to the device.
                 // Control flow will now go to the callback functions when BTLE events occur.
+                bluetoothDevice.createBond();
                 gatt = bluetoothDevice.connectGatt(getApplicationContext(), false, callback);
+
+
             }
         }
     };

@@ -1,6 +1,7 @@
 package com.tonydicola.bletest.app;
 
 import android.app.Activity;
+import android.appwidget.AppWidgetManager;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothAdapter.LeScanCallback;
 import android.bluetooth.BluetoothDevice;
@@ -8,6 +9,9 @@ import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattDescriptor;
+import android.content.ComponentName;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
@@ -61,46 +65,56 @@ public class MainActivity extends Activity {
     private BluetoothGattCallback callback = new BluetoothGattCallback() {
         // Called whenever the device connection state changes, i.e. from disconnected to connected.
         @Override
-        public void onConnectionStateChange(final BluetoothGatt gatt, int status, int newState) {
+        public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
             super.onConnectionStateChange(gatt, status, newState);
-            if (newState == BluetoothGatt.STATE_CONNECTED) {
-                MainActivity.this.gatt = gatt;
-                // Discover services.
-                Log.i("ble Connect", "Connected");
-                // schedule readRemoteRssi here
-                if(set_timer) {
-                    if(timer != null) {
-                        read_rssi_task.cancel();
-                        timer.cancel();
-                        timer.purge();
-                    }
-                    read_rssi_task = new TimerTask() {
-                        @Override
-                        public void run() {
-                            gatt.readRemoteRssi();
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                if (newState == BluetoothGatt.STATE_CONNECTED) {
+                    MainActivity.this.gatt = gatt;
+                    // Discover services.
+                    Log.i("ble Connect", "Connected");
+                    // schedule readRemoteRssi here
+                    if (set_timer) {
+                        if (timer != null) {
+                            read_rssi_task.cancel();
+                            timer.cancel();
+                            timer.purge();
                         }
-                    };
-                    timer = new Timer();
-                    timer.schedule(read_rssi_task, 0, 1000);
-                    set_timer = false;
-                    gatt.discoverServices();
-                ble_state = "connected";
-                changeColor(ble_state);
-                }
+                        read_rssi_task = new TimerTask() {
+                            @Override
+                            public void run() {
+                                MainActivity.this.gatt.readRemoteRssi();
+                            }
+                        };
+                        timer = new Timer();
+                        timer.schedule(read_rssi_task, 0, 250);
+                        set_timer = false;
+                        gatt.discoverServices();
+                        ble_state = "connected";
+                        changeColor(ble_state);
+                    }
 
-            } else if (newState == BluetoothGatt.STATE_DISCONNECTED) {
-                //destroy Timer
-                Log.i("ble Connect", "Disconnected");
-                ble_state = "disconnected";
-                changeColor(ble_state);
-                if(timer != null) {
+                } else if (newState == BluetoothGatt.STATE_DISCONNECTED) {
+                    //destroy Timer
+                    Log.i("ble Connect", "Disconnected");
+                    ble_state = "disconnected";
+                    changeColor(ble_state);
+                    if (timer != null) {
                         read_rssi_task.cancel();
                         timer.cancel();
                         timer.purge();
                         set_timer = true;
                     }
-                Log.i("ble Connect", "Scanning");
-                adapter.startLeScan(scanCallback);
+                    if(MainActivity.this.gatt != null) {
+                        MainActivity.this.gatt.disconnect();
+                        MainActivity.this.gatt.close();
+                        MainActivity.this.gatt = null;
+                        tx = null;
+                        rx = null;
+                    }
+                    Log.i("ble Connect", "Scanning");
+                    adapter.startLeScan(scanCallback);
+                }
+                updateState();
             }
         }
 
@@ -147,13 +161,18 @@ public class MainActivity extends Activity {
         @Override
         public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
             super.onCharacteristicChanged(gatt, characteristic);
-            String lock_state = characteristic.getStringValue(0);
-            Log.i("arduino in comms", lock_state);
-            if (lock_state.equals("l")) {
-                toggleLock(true);
+            if (characteristic.getUuid().equals(RX_UUID)) {
+                String lock_state = characteristic.getStringValue(0);
+                Log.i("arduino in comms", lock_state);
+                if (lock_state.equals("l")) {
+                    toggleLock(true);
+                } else if (lock_state.equals("u")) {
+                    toggleLock(false);
+                }
+                updateState();
             }
-            else if(lock_state.equals("u")){
-                toggleLock(false);
+            else{
+                Log.i("arduino in comms", characteristic.getUuid().toString());
             }
         }
     };
@@ -164,7 +183,7 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         // Grab references to UI elements.
-
+        Log.i("test", "starting");
         read_rssi_task = new TimerTask() {
             @Override
             public void run() {
@@ -183,7 +202,7 @@ public class MainActivity extends Activity {
         mode_toggle = (ToggleButton) findViewById(R.id.mode_state);
         mode_toggle.setOnClickListener(mode_toggle_handler);
         mode_toggle.setChecked(true); //we probably save the mode last time to local drive.\
-
+        updateState();
         Log.i("test", "starting");
 
         adapter = BluetoothAdapter.getDefaultAdapter();
@@ -192,11 +211,36 @@ public class MainActivity extends Activity {
 
     }
 
+    public void updateWidget() {
+        AppWidgetManager mgr = AppWidgetManager.getInstance(this);
+        Intent update = new Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
+        update.setClass(this,bletestapp.class);
+        update.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS,mgr.getAppWidgetIds(new ComponentName(this,bletestapp.class)));
+        this.sendBroadcast(update);
+        this.finish();
+    }
+
+    public void updateState() {
+        SharedPreferences pref =  this.getSharedPreferences("ble", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = pref.edit();
+        editor.putBoolean("mode",mode);
+        editor.putBoolean("lock_state",lock_toggle.isChecked());
+        editor.putString("ble_state",ble_state);
+        editor.commit();
+
+        Log.i("update","updated");
+        AppWidgetManager mgr = AppWidgetManager.getInstance(this);
+        Intent update = new Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
+        update.setClass(this,bletestapp.class);
+        update.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS,mgr.getAppWidgetIds(new ComponentName(this,bletestapp.class)));
+        this.sendBroadcast(update);
+    }
+
     View.OnClickListener toggle_handler = new View.OnClickListener(){
         public void onClick(View v){
             Log.i("toggle","toggle pressed");
             boolean locked = lock_toggle.isChecked();
-
+            updateState();
             if(tx != null) {
                 if(locked) {
                     tx.setValue(lock_command.getBytes(Charset.forName("UTF-8")));
@@ -216,6 +260,7 @@ public class MainActivity extends Activity {
     View.OnClickListener mode_toggle_handler = new View.OnClickListener() {
         public void onClick(View v) {
             mode = mode_toggle.isChecked();
+            updateState();
         }
     };
 
@@ -232,7 +277,7 @@ public class MainActivity extends Activity {
                 changeColor(ble_state);
                 // Connect to the device.
                 // Control flow will now go to the callback functions when BTLE events occur.
-                gatt = bluetoothDevice.connectGatt(getApplicationContext(), true, callback);
+                gatt = bluetoothDevice.connectGatt(getApplicationContext(), false, callback);
             }
         }
     };
@@ -278,7 +323,7 @@ public class MainActivity extends Activity {
             @Override
             public void run() {
                 if(state.equals("disconnected")) {
-                    layout.setBackgroundColor(Color.parseColor("#FFBBBB"));
+                    layout.setBackgroundColor(Color.parseColor("#EBEBEB"));
                 }
                 else if(state.equals("found")) {
                     layout.setBackgroundColor(Color.parseColor("#A2D39C"));
@@ -325,7 +370,7 @@ public class MainActivity extends Activity {
                                     mostSignificantBit));
                         } catch (IndexOutOfBoundsException e) {
                             // Defensive programming.
-                            //Log.e(LOG_TAG, e.toString());
+                            Log.e("UUID Parsing", e.toString());
                             continue;
                         } finally {
                             // Move the offset to read the next uuid.

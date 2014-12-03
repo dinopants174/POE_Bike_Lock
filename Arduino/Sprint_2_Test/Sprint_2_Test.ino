@@ -15,8 +15,8 @@
 Adafruit_BLE_UART BTLEserial = Adafruit_BLE_UART(ADAFRUITBLE_REQ, ADAFRUITBLE_RDY, ADAFRUITBLE_RST);
 
 Servo servo;
-int pos = 10;
-int desired_pos = 40;  //change this depending on where servo needs to go for unlock command
+int pos = 85;
+int desired_pos = 70;  //change this depending on where servo needs to go for unlock command
 
 String phone_str = "";
 int rssi_val = 0;
@@ -32,12 +32,12 @@ int prev_rssi_avg = 0;
 int diff = 0;
 int avg_diff = 0;
 int i = 0;
-const int rssi_unlock_val = -60;  //change this depending on rssi signal
-const int rssi_lock_val = -85;    //change this depending on rssi signal
+const int rssi_unlock_val = -65;  //change this depending on rssi signal
+const int rssi_lock_val = -75;    //change this depending on rssi signal
 //int count = 0;
 
 String lock_state = "";
-String prev_lock_state = "";
+String prev_lock_state = "l";
 
 /**************************************************************************/
 /*!
@@ -56,7 +56,6 @@ void setup(void)
   
   servo.write(pos);
   delay(15);
-  prev_lock_state = "l";
   
   for (i=0; i<= 10; i++){
     rssi_vals.push(0);
@@ -115,7 +114,7 @@ void loop()
         }
       else if (c == 'l'){ 
         //Serial.println("I am locking because of app input");
-        pos = 10;
+        pos = 85;
         lock_state = "l";
         }
       else{
@@ -161,13 +160,13 @@ void loop()
                       
        if (current_rssi_avg <= rssi_lock_val && avg_diff < 0){
              Serial.println("I am locking because of RSSI");
-             pos = desired_pos;
+             pos = 85;
              lock_state = "l";
           }
             
           else if (current_rssi_avg >= rssi_unlock_val && avg_diff > 0){
               Serial.println("I am unlocking because of RSSI"); 
-              pos = 10;
+              pos = desired_pos;
               lock_state = "u";
            }
          
@@ -179,10 +178,13 @@ void loop()
     
 
     if (lock_state != prev_lock_state){
-       //if (lock_state == ""){
-          //BTLEserial.print("l");
-        //}
-        //else{
+       if (lock_state == ""){
+         lock_state = "l";
+         prev_lock_state = "l";
+         BTLEserial.print(lock_state);
+         //BTLEserial.print("l");
+        }
+        else{
           BTLEserial.print(lock_state);
           //BTLEserial.print(";");
           Serial.println("");
@@ -194,7 +196,7 @@ void loop()
 //          Serial.println("");
           //Serial.print(";");
           prev_lock_state = lock_state;   
-          //}    
+          }    
         }
       }
    }

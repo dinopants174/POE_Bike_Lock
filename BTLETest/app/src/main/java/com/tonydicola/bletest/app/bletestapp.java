@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.PendingIntent;
 import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProvider;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -26,19 +27,17 @@ public class bletestapp extends AppWidgetProvider {
     @Override
     public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
         // There may be multiple widgets active, so update all of them
-        Log.i("widget", "0");
+        Log.i("widget","onUpdate!");
         final int N = appWidgetIds.length;
         for (int i = 0; i < N; i++) {
 
             //updateAppWidget(context, appWidgetManager, appWidgetIds[i]);
-
-            Log.i("widget", "1");
             SharedPreferences pref =  context.getSharedPreferences("ble", Activity.MODE_PRIVATE);
             ble_state = pref.getString("ble_state", "wrong pref name");
             mode = pref.getBoolean("mode",true);
             lock_state = pref.getBoolean("lock_state",true);
-            Log.i("widget", "2");
             RemoteViews remoteViews = new RemoteViews(context.getPackageName(), R.layout.bletestapp);
+            Log.i("widget",ble_state);
 
             if (lock_state) {
                 remoteViews.setImageViewResource(R.id.widget_lock, R.drawable.lock_icon);
@@ -46,36 +45,80 @@ public class bletestapp extends AppWidgetProvider {
             else {
                 remoteViews.setImageViewResource(R.id.widget_lock, R.drawable.unlock_icon);
             }
-            Log.i("widget", "3");
             if (mode) {
                 remoteViews.setImageViewResource(R.id.widget_mode, R.drawable.on_icon);
             }
             else {
                 remoteViews.setImageViewResource(R.id.widget_mode, R.drawable.off_icon);
             }
-            Log.i("widget", "4");
             if(ble_state.equals("connected")) {
                 remoteViews.setImageViewResource(R.id.background, R.drawable.background_connected);
             }
             else {
                 remoteViews.setImageViewResource(R.id.background, R.drawable.background_disconnected);
             }
-            Log.i("widget", "onUpdate");
+            remoteViews.setOnClickPendingIntent(R.id.widget_lock,getPendingSelfIntent(context,"lock"));
+            remoteViews.setOnClickPendingIntent(R.id.widget_mode,getPendingSelfIntent(context,"mode"));
             appWidgetManager.updateAppWidget(appWidgetIds[i],remoteViews);
 
         }
 
+
     }
 
+    protected PendingIntent getPendingSelfIntent(Context context, String action) {
+        Log.i("widget","pendingintent");
+        Intent intent = new Intent(context, getClass());
+        intent.setAction(action);
+        return PendingIntent.getBroadcast(context, 0, intent, 0);
+    }
 
     @Override
     public void onEnabled(Context context) {
         // Enter relevant functionality for when the first widget is created
+        Log.i("widget","onEnable");
+        super.onEnabled(context);
     }
 
     @Override
     public void onDisabled(Context context) {
         // Enter relevant functionality for when the last widget is disabled
+        super.onDisabled(context);
+    }
+
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        SharedPreferences pref =  context.getSharedPreferences("ble", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = pref.edit();
+        RemoteViews remoteViews = new RemoteViews(context.getPackageName(), R.layout.bletestapp);
+        boolean lock_state;
+        boolean mode;
+        if ("lock".equals(intent.getAction())) {
+            lock_state = MainActivity.toggle_lock(true);
+            editor.putBoolean("lock_state",lock_state);
+            editor.commit();
+            if (lock_state) {
+                Log.i("widget","locked");
+                remoteViews.setImageViewResource(R.id.widget_lock, R.drawable.lock_icon);
+            }
+            else {
+                Log.i("widget","unlocked");
+                remoteViews.setImageViewResource(R.id.widget_lock, R.drawable.unlock_icon);
+            }
+        } else if ("mode".equals(intent.getAction())) {
+            mode = MainActivity.toggle_mode(true);
+            editor.putBoolean("mode",mode);
+            editor.commit();
+            if (mode) {
+                remoteViews.setImageViewResource(R.id.widget_mode, R.drawable.on_icon);
+            }
+            else {
+                remoteViews.setImageViewResource(R.id.widget_mode, R.drawable.off_icon);
+            }
+        }
+        ComponentName a = new ComponentName(context,bletestapp.class);
+        (AppWidgetManager.getInstance(context)).updateAppWidget(a, remoteViews);
+        super.onReceive(context, intent);
     }
 
     static void updateAppWidget(Context context, AppWidgetManager appWidgetManager,

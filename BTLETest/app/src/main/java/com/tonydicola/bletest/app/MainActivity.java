@@ -40,7 +40,7 @@ public class MainActivity extends Activity {
     private Timer rssi_timer;
     private Boolean set_timer = true;
     private TimerTask read_rssi_task;
-    private Boolean mode = true; //mode
+    private static Boolean mode = true; //mode
 
     private Timer call_timer;
     private Boolean call = true;
@@ -48,20 +48,20 @@ public class MainActivity extends Activity {
 
     // UI elements
     private TextView rssi_text_view;
-    private ToggleButton lock_toggle;
-    private ToggleButton mode_toggle; //for auto-mode on/off
+    private static ToggleButton lock_toggle;
+    private static ToggleButton mode_toggle; //for auto-mode on/off
     private RelativeLayout layout;
 
 
     // BTLE state
     private BluetoothAdapter adapter;
-    private BluetoothGatt gatt;
-    private BluetoothGattCharacteristic tx;
+    private static BluetoothGatt gatt;
+    private static BluetoothGattCharacteristic tx;
     private BluetoothGattCharacteristic rx;
 
     String rssi_string;
-    String unlock_command = "u";
-    String lock_command = "l";
+    static String  unlock_command = "u";
+    static String lock_command = "l";
     String ble_state = "disconnected";
     String passcode = "1112"+":";
     String   call_char = "a";
@@ -172,6 +172,12 @@ public class MainActivity extends Activity {
                         rssi_timer.purge();
                         set_timer = true;
                     }
+                    if (call_timer != null) {
+                        call_task.cancel();
+                        call_timer.cancel();
+                        call_timer.purge();
+                        call = true;
+                    }
                     if(MainActivity.this.gatt != null) {
                         MainActivity.this.gatt.disconnect();
                         MainActivity.this.gatt.close();
@@ -233,10 +239,10 @@ public class MainActivity extends Activity {
                 String input = characteristic.getStringValue(0);
                 Log.i("arduino in comms", input);
                 if (input.equals("l")) {
-                    toggleLock(true);
+                    update_lock_button(true);
                 }
                 else if (input.equals("u")) {
-                    toggleLock(false);
+                    update_lock_button(false);
                 }
                 else if (input.equals("z")){
                     onResponse();
@@ -274,30 +280,25 @@ public class MainActivity extends Activity {
         }
     };
 
+
     View.OnClickListener toggle_handler = new View.OnClickListener(){
         public void onClick(View v){
-            Log.i("toggle","toggle pressed");
-            boolean locked = lock_toggle.isChecked();
+            toggle_lock(false);
             updateState();
-            if(tx != null) {
-                if(locked) {
-                    tx.setValue(lock_command.getBytes(Charset.forName("UTF-8")));
-                    Log.i("toggle", "sending lock");
-                }
-                else{
-                    tx.setValue(unlock_command.getBytes(Charset.forName("UTF-8")));
-                    Log.i("toggle", "sending unlock");
-
-                }
-                gatt.writeCharacteristic(tx);
-            }
         }
     };
 
+    public static boolean toggle_mode(boolean called_by_widget){
+        if (called_by_widget) {
+            mode_toggle.setChecked(!mode_toggle.isChecked());
+        }
+        mode = mode_toggle.isChecked();
+        return mode;
+    }
     //on click listener for mode toggle button
     View.OnClickListener mode_toggle_handler = new View.OnClickListener() {
         public void onClick(View v) {
-            mode = mode_toggle.isChecked();
+            toggle_mode(false);
             updateState();
         }
     };
@@ -365,13 +366,35 @@ public class MainActivity extends Activity {
         });
     }
 
-    private void toggleLock(final boolean locked){
+    private void update_lock_button(final boolean locked){
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
                 lock_toggle.setChecked(locked);
             }
         });
+    }
+
+    public static boolean toggle_lock(boolean called_by_widget){
+        Log.i("toggle", "toggle pressed");
+        if (called_by_widget) {
+            lock_toggle.setChecked(!lock_toggle.isChecked());
+        }
+        boolean locked = lock_toggle.isChecked();
+
+        if(tx != null) {
+            if(locked) {
+                tx.setValue(lock_command.getBytes(Charset.forName("UTF-8")));
+                Log.i("toggle", "sending lock");
+            }
+            else{
+                tx.setValue(unlock_command.getBytes(Charset.forName("UTF-8")));
+                Log.i("toggle", "sending unlock");
+
+            }
+            gatt.writeCharacteristic(tx);
+        }
+        return locked;
     }
 
     private void changeColor(final String state){
@@ -392,15 +415,6 @@ public class MainActivity extends Activity {
     }
 
     //Widget Section
-    public void updateWidget() {
-        AppWidgetManager mgr = AppWidgetManager.getInstance(this);
-        Intent update = new Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
-        update.setClass(this,bletestapp.class);
-        update.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS,mgr.getAppWidgetIds(new ComponentName(this,bletestapp.class)));
-        this.sendBroadcast(update);
-        this.finish();
-    }
-
     public void updateState() {
         SharedPreferences pref =  this.getSharedPreferences("ble", Activity.MODE_PRIVATE);
         SharedPreferences.Editor editor = pref.edit();
@@ -409,12 +423,21 @@ public class MainActivity extends Activity {
         editor.putString("ble_state",ble_state);
         editor.commit();
 
-        Log.i("update","updated");
         AppWidgetManager mgr = AppWidgetManager.getInstance(this);
         Intent update = new Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
         update.setClass(this,bletestapp.class);
         update.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS,mgr.getAppWidgetIds(new ComponentName(this,bletestapp.class)));
         this.sendBroadcast(update);
+        Log.i("update","updated");
+    }
+
+    public void updateWidget() {
+        AppWidgetManager mgr = AppWidgetManager.getInstance(this);
+        Intent update = new Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
+        update.setClass(this,bletestapp.class);
+        update.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS,mgr.getAppWidgetIds(new ComponentName(this,bletestapp.class)));
+        this.sendBroadcast(update);
+        this.finish();
     }
 
     //State controll section

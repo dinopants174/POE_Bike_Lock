@@ -37,29 +37,95 @@ public class MainActivity extends Activity {
     public static UUID RX_UUID = UUID.fromString("6E400003-B5A3-F393-E0A9-E50E24DCCA9E");
     // UUID for the BTLE client characteristic which is necessary for notifications.
     public static UUID CLIENT_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
-    private Timer timer;
+    private Timer rssi_timer;
     private Boolean set_timer = true;
     private TimerTask read_rssi_task;
-    private Boolean mode = true; //mode
+    private static Boolean mode = true; //mode
+
+    private Timer call_timer;
+    private Boolean call = true;
+    private TimerTask call_task;
 
     // UI elements
     private TextView rssi_text_view;
-    private ToggleButton lock_toggle;
-    private ToggleButton mode_toggle; //for auto-mode on/off
+    private static ToggleButton lock_toggle;
+    private static ToggleButton mode_toggle; //for auto-mode on/off
     private RelativeLayout layout;
 
 
     // BTLE state
     private BluetoothAdapter adapter;
-    private BluetoothGatt gatt;
-    private BluetoothGattCharacteristic tx;
+    private static BluetoothGatt gatt;
+    private static BluetoothGattCharacteristic tx;
     private BluetoothGattCharacteristic rx;
 
     String rssi_string;
-    String unlock_command = "u";
-    String lock_command = "l";
+    static String  unlock_command = "u";
+    static String lock_command = "l";
     String ble_state = "disconnected";
+    String passcode = "1112"+":";
+    String   call_char = "a";
 
+
+    // OnCreate, called once to initialize the activity.
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        // Grab references to UI elements.
+        Log.i("test", "starting");
+        read_rssi_task = new TimerTask() {
+            @Override
+            public void run() {
+                gatt.readRemoteRssi();
+            }
+        };
+
+        call_task = new TimerTask() {
+            @Override
+            public void run() {
+                sendCall();
+            }
+        };
+
+        rssi_text_view = (TextView) findViewById(R.id.rssi_text);
+
+        layout = (RelativeLayout) findViewById(R.id.layout);
+        changeColor(ble_state);
+        lock_toggle = (ToggleButton) findViewById(R.id.lock_state);
+        lock_toggle.setOnClickListener(toggle_handler);
+        lock_toggle.setChecked(true);
+
+        //for mode toggle button
+        mode_toggle = (ToggleButton) findViewById(R.id.mode_state);
+        mode_toggle.setOnClickListener(mode_toggle_handler);
+        mode_toggle.setChecked(true); //we probably save the mode last time to local drive.\
+        updateState();
+        Log.i("test", "starting");
+
+        adapter = BluetoothAdapter.getDefaultAdapter();
+        Log.i("ble Connect", "Scanning");
+        adapter.startLeScan(scanCallback);
+
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (gatt != null) {
+            // For better reliability be careful to disconnect and close the connection.
+            gatt.disconnect();
+            gatt.close();
+            gatt = null;
+            tx = null;
+            rx = null;
+            if (rssi_timer != null) {
+                read_rssi_task.cancel();
+                rssi_timer.cancel();
+                set_timer = true;
+            }
+        }
+    }
 
     // Main BTLE device callback where much of the logic occurs.
     private BluetoothGattCallback callback = new BluetoothGattCallback() {
@@ -72,37 +138,45 @@ public class MainActivity extends Activity {
                     MainActivity.this.gatt = gatt;
                     // Discover services.
                     Log.i("ble Connect", "Connected");
-                    // schedule readRemoteRssi here
-                    if (set_timer) {
-                        if (timer != null) {
-                            read_rssi_task.cancel();
-                            timer.cancel();
-                            timer.purge();
-                        }
-                        read_rssi_task = new TimerTask() {
-                            @Override
-                            public void run() {
-                                MainActivity.this.gatt.readRemoteRssi();
+                    // schedule call response here
+                    if(call){
+                            if (call_timer != null) {
+                                call_task.cancel();
+                                call_timer.cancel();
+                                call_timer.purge();
                             }
-                        };
-                        timer = new Timer();
-                        timer.schedule(read_rssi_task, 0, 250);
-                        set_timer = false;
-                        gatt.discoverServices();
-                        ble_state = "connected";
-                        changeColor(ble_state);
-                    }
+                            call_task = new TimerTask() {
+                                @Override
+                                public void run() {
+                                    sendCall();
+                                }
+                            };
+                            call_timer = new Timer();
+                            call_timer.schedule(call_task, 0, 1000);
+                            call = false;
+                            Log.i("Call Response Protocol", "Sending Call");
+                        }
 
-                } else if (newState == BluetoothGatt.STATE_DISCONNECTED) {
+                    gatt.discoverServices();
+                    ble_state = "connected";
+                    changeColor(ble_state);
+                    }
+                else if (newState == BluetoothGatt.STATE_DISCONNECTED) {
                     //destroy Timer
                     Log.i("ble Connect", "Disconnected");
                     ble_state = "disconnected";
                     changeColor(ble_state);
-                    if (timer != null) {
+                    if (rssi_timer != null) {
                         read_rssi_task.cancel();
-                        timer.cancel();
-                        timer.purge();
+                        rssi_timer.cancel();
+                        rssi_timer.purge();
                         set_timer = true;
+                    }
+                    if (call_timer != null) {
+                        call_task.cancel();
+                        call_timer.cancel();
+                        call_timer.purge();
+                        call = true;
                     }
                     if(MainActivity.this.gatt != null) {
                         MainActivity.this.gatt.disconnect();
@@ -121,7 +195,7 @@ public class MainActivity extends Activity {
         @Override
         public void onReadRemoteRssi(BluetoothGatt gatt, int rssi, int status) {
             if (status == BluetoothGatt.GATT_SUCCESS && mode) { //mode condition added
-                Log.i("RSSI Callback", String.format("BluetoothGatt ReadRssi[%d]", rssi));
+                //Log.i("RSSI Callback", String.format("BluetoothGatt ReadRssi[%d]", rssi));
                 rssi_string = "" + rssi + ";";
                 writeRSSI(rssi_string);
                 if (tx == null) {
@@ -129,9 +203,9 @@ public class MainActivity extends Activity {
                     Log.i("RSSI Callback", "TX is empty");
                     return;
                 }
-                Log.i("RSSI Callback","sending");
-                tx.setValue(rssi_string.getBytes(Charset.forName("UTF-8")));
-                gatt.writeCharacteristic(tx);
+                //Log.i("RSSI Callback","sending");
+                //tx.setValue(rssi_string.getBytes(Charset.forName("UTF-8")));
+                //gatt.writeCharacteristic(tx);
             }
         }
 
@@ -162,105 +236,26 @@ public class MainActivity extends Activity {
         public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
             super.onCharacteristicChanged(gatt, characteristic);
             if (characteristic.getUuid().equals(RX_UUID)) {
-                String lock_state = characteristic.getStringValue(0);
-                Log.i("arduino in comms", lock_state);
-                if (lock_state.equals("l")) {
-                    toggleLock(true);
-                } else if (lock_state.equals("u")) {
-                    toggleLock(false);
+                String input = characteristic.getStringValue(0);
+                Log.i("arduino in comms", input);
+                if (input.equals("l")) {
+                    update_lock_button(true);
                 }
+                else if (input.equals("u")) {
+                    update_lock_button(false);
+                }
+                else if (input.equals("z")){
+                    onResponse();
+                }
+                else if (input.equals("f")){
+                    onAuthentication();
+                }
+
                 updateState();
             }
             else{
                 Log.i("arduino in comms", characteristic.getUuid().toString());
             }
-        }
-    };
-
-    // OnCreate, called once to initialize the activity.
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-        // Grab references to UI elements.
-        Log.i("test", "starting");
-        read_rssi_task = new TimerTask() {
-            @Override
-            public void run() {
-                gatt.readRemoteRssi();
-            }
-        };
-        rssi_text_view = (TextView) findViewById(R.id.rssi_text);
-
-        layout = (RelativeLayout) findViewById(R.id.layout);
-        changeColor(ble_state);
-        lock_toggle = (ToggleButton) findViewById(R.id.lock_state);
-        lock_toggle.setOnClickListener(toggle_handler);
-        lock_toggle.setChecked(true);
-
-        //for mode toggle button
-        mode_toggle = (ToggleButton) findViewById(R.id.mode_state);
-        mode_toggle.setOnClickListener(mode_toggle_handler);
-        mode_toggle.setChecked(true); //we probably save the mode last time to local drive.\
-        updateState();
-        Log.i("test", "starting");
-
-        adapter = BluetoothAdapter.getDefaultAdapter();
-        Log.i("ble Connect", "Scanning");
-        adapter.startLeScan(scanCallback);
-
-    }
-
-    public void updateWidget() {
-        AppWidgetManager mgr = AppWidgetManager.getInstance(this);
-        Intent update = new Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
-        update.setClass(this,bletestapp.class);
-        update.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS,mgr.getAppWidgetIds(new ComponentName(this,bletestapp.class)));
-        this.sendBroadcast(update);
-        this.finish();
-    }
-
-    public void updateState() {
-        SharedPreferences pref =  this.getSharedPreferences("ble", Activity.MODE_PRIVATE);
-        SharedPreferences.Editor editor = pref.edit();
-        editor.putBoolean("mode",mode);
-        editor.putBoolean("lock_state",lock_toggle.isChecked());
-        editor.putString("ble_state",ble_state);
-        editor.commit();
-
-        Log.i("update","updated");
-        AppWidgetManager mgr = AppWidgetManager.getInstance(this);
-        Intent update = new Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
-        update.setClass(this,bletestapp.class);
-        update.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS,mgr.getAppWidgetIds(new ComponentName(this,bletestapp.class)));
-        this.sendBroadcast(update);
-    }
-
-    View.OnClickListener toggle_handler = new View.OnClickListener(){
-        public void onClick(View v){
-            Log.i("toggle","toggle pressed");
-            boolean locked = lock_toggle.isChecked();
-            updateState();
-            if(tx != null) {
-                if(locked) {
-                    tx.setValue(lock_command.getBytes(Charset.forName("UTF-8")));
-                    Log.i("toggle", "sending lock");
-                }
-                else{
-                    tx.setValue(unlock_command.getBytes(Charset.forName("UTF-8")));
-                    Log.i("toggle", "sending unlock");
-
-                }
-                gatt.writeCharacteristic(tx);
-            }
-        }
-    };
-
-    //on click listener for mode toggle button
-    View.OnClickListener mode_toggle_handler = new View.OnClickListener() {
-        public void onClick(View v) {
-            mode = mode_toggle.isChecked();
-            updateState();
         }
     };
 
@@ -277,7 +272,7 @@ public class MainActivity extends Activity {
                 changeColor(ble_state);
                 // Connect to the device.
                 // Control flow will now go to the callback functions when BTLE events occur.
-                bluetoothDevice.createBond();
+                // bluetoothDevice.createBond();
                 gatt = bluetoothDevice.connectGatt(getApplicationContext(), false, callback);
 
 
@@ -285,58 +280,29 @@ public class MainActivity extends Activity {
         }
     };
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        if (gatt != null) {
-            // For better reliability be careful to disconnect and close the connection.
-            gatt.disconnect();
-            gatt.close();
-            gatt = null;
-            tx = null;
-            rx = null;
-            if (timer != null) {
-                read_rssi_task.cancel();
-                timer.cancel();
-                set_timer = true;
-            }
+
+    View.OnClickListener toggle_handler = new View.OnClickListener(){
+        public void onClick(View v){
+            toggle_lock(false);
+            updateState();
         }
-    }
+    };
 
-    private void writeRSSI(final CharSequence text) {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                rssi_text_view.setText(text);
-            }
-        });
+    public static boolean toggle_mode(boolean called_by_widget){
+        if (called_by_widget) {
+            mode_toggle.setChecked(!mode_toggle.isChecked());
+        }
+        mode = mode_toggle.isChecked();
+        return mode;
     }
+    //on click listener for mode toggle button
+    View.OnClickListener mode_toggle_handler = new View.OnClickListener() {
+        public void onClick(View v) {
+            toggle_mode(false);
+            updateState();
+        }
+    };
 
-    private void toggleLock(final boolean locked){
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                lock_toggle.setChecked(locked);
-            }
-        });
-    }
-
-    private void changeColor(final String state){
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                if(state.equals("disconnected")) {
-                    layout.setBackgroundColor(Color.parseColor("#EBEBEB"));
-                }
-                else if(state.equals("found")) {
-                    layout.setBackgroundColor(Color.parseColor("#A2D39C"));
-                }
-                else if(state.equals("connected")) {
-                    layout.setBackgroundColor(Color.parseColor("#82CA9D"));
-                }
-            }
-        });
-    }
     // Filtering by custom UUID is broken in Android 4.3 and 4.4, see:
     //   http://stackoverflow.com/questions/18019161/startlescan-with-128-bit-uuids-doesnt-work-on-native-android-ble-implementation?noredirect=1#comment27879874_18019161
     // This is a workaround function from the SO thread to manually parse advertisement data.
@@ -389,4 +355,144 @@ public class MainActivity extends Activity {
         }
         return uuids;
     }
+
+    //UI Thread Section
+    private void writeRSSI(final CharSequence text) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                rssi_text_view.setText(text);
+            }
+        });
+    }
+
+    private void update_lock_button(final boolean locked){
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                lock_toggle.setChecked(locked);
+            }
+        });
+    }
+
+    public static boolean toggle_lock(boolean called_by_widget){
+        Log.i("toggle", "toggle pressed");
+        if (called_by_widget) {
+            lock_toggle.setChecked(!lock_toggle.isChecked());
+        }
+        boolean locked = lock_toggle.isChecked();
+
+        if(tx != null) {
+            if(locked) {
+                tx.setValue(lock_command.getBytes(Charset.forName("UTF-8")));
+                Log.i("toggle", "sending lock");
+            }
+            else{
+                tx.setValue(unlock_command.getBytes(Charset.forName("UTF-8")));
+                Log.i("toggle", "sending unlock");
+
+            }
+            gatt.writeCharacteristic(tx);
+        }
+        return locked;
+    }
+
+    private void changeColor(final String state){
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if(state.equals("disconnected")) {
+                    layout.setBackgroundColor(Color.parseColor("#EBEBEB"));
+                }
+                else if(state.equals("found")) {
+                    layout.setBackgroundColor(Color.parseColor("#A2D39C"));
+                }
+                else if(state.equals("connected")) {
+                    layout.setBackgroundColor(Color.parseColor("#82CA9D"));
+                }
+            }
+        });
+    }
+
+    //Widget Section
+    public void updateState() {
+        SharedPreferences pref =  this.getSharedPreferences("ble", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = pref.edit();
+        editor.putBoolean("mode",mode);
+        editor.putBoolean("lock_state",lock_toggle.isChecked());
+        editor.putString("ble_state",ble_state);
+        editor.commit();
+
+        AppWidgetManager mgr = AppWidgetManager.getInstance(this);
+        Intent update = new Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
+        update.setClass(this,bletestapp.class);
+        update.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS,mgr.getAppWidgetIds(new ComponentName(this,bletestapp.class)));
+        this.sendBroadcast(update);
+        Log.i("update","updated");
+    }
+
+    public void updateWidget() {
+        AppWidgetManager mgr = AppWidgetManager.getInstance(this);
+        Intent update = new Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
+        update.setClass(this,bletestapp.class);
+        update.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS,mgr.getAppWidgetIds(new ComponentName(this,bletestapp.class)));
+        this.sendBroadcast(update);
+        this.finish();
+    }
+
+    //State controll section
+
+    public void onResponse(){
+        Log.i("Call Response Protocol", "Received Call");
+        if (call_timer != null) {
+            call_task.cancel();
+            call_timer.cancel();
+            call_timer.purge();
+            call = true;
+        }
+        sendPasscode();
+    }
+
+    public void onAuthentication(){
+        if (set_timer) {
+            if (rssi_timer != null) {
+                read_rssi_task.cancel();
+                rssi_timer.cancel();
+                rssi_timer.purge();
+            }
+            read_rssi_task = new TimerTask() {
+                @Override
+                public void run() {
+                    MainActivity.this.gatt.readRemoteRssi();
+                }
+            };
+            rssi_timer = new Timer();
+            rssi_timer.schedule(read_rssi_task, 0, 250);
+            set_timer = false;
+        }
+
+    }
+    public void sendPasscode(){
+        if(tx != null) {
+            Log.i("Sending passcode", passcode);
+            tx.setValue(passcode.getBytes(Charset.forName("UTF-8")));
+            gatt.writeCharacteristic(tx);
+        }
+        else{
+            Log.i("Sending Passcode", "Couldn't Send");
+        }
+    }
+
+    public void sendCall(){
+        if(tx != null) {
+            Log.i("Sending call", call_char);
+            tx.setValue(call_char.getBytes(Charset.forName("UTF-8")));
+            gatt.writeCharacteristic(tx);
+        }
+        else{
+            Log.i("Sending call", "Couldn't Send");
+        }
+    }
+
 }
+

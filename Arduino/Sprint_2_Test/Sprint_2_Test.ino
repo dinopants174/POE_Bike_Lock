@@ -5,12 +5,22 @@
 #include "Adafruit_BLE_UART.h"
 #include <Servo.h>
 #include <Average.h>
+#include <EEPROM.h>
 
 // Connect CLK/MISO/MOSI to hardware SPI
 // e.g. On UNO & compatible: CLK = 13, MISO = 12, MOSI = 11
 #define ADAFRUITBLE_REQ 10
 #define ADAFRUITBLE_RDY 2     // This should be an interrupt pin, on Uno thats #2 or #3
 #define ADAFRUITBLE_RST 9
+
+int address = 0;
+byte value;
+int check;
+int passcode;
+byte eeprom_store = 0;
+boolean first_connection;
+boolean phone_secure = false;
+boolean call_response_start = true;
 
 Adafruit_BLE_UART BTLEserial = Adafruit_BLE_UART(ADAFRUITBLE_REQ, ADAFRUITBLE_RDY, ADAFRUITBLE_RST);
 
@@ -62,6 +72,17 @@ void setup(void)
     diffs.push(0);
   }
   
+  value = EEPROM.read(address);
+  if (value == 255){//default value in EEPROM right here right now
+    //yo, I need to take the first thing the phone sends me after my first connection
+    first_connection = true;
+    Serial.println("Yo I am connecting for first time");
+  }
+  else{
+    first_connection = false; 
+    Serial.println("Yo I am a connection veteran");
+  }
+  
   //BTLEserial.print(prev_lock_state);
   //BTLEserial.print(";");
 }
@@ -91,13 +112,86 @@ void loop()
 
     laststatus = status;
   }
+  
+  if (status == ACI_EVT_DISCONNECTED){
+    phone_secure = false;
+    call_response_start = true;
+  }
 
   if (status == ACI_EVT_CONNECTED) {
-    
-    if (BTLEserial.available()) {
-      //Serial.print("* "); Serial.print(BTLEserial.available()); Serial.println(F(" bytes available from BTLE"));
+    if (call_response_start){
+    while (BTLEserial.available()){  //call response protocol
+      char c = BTLEserial.read();
+      Serial.println(c);
+      Serial.println("Austin has successfully sent me the character 'a'");
+      if (c == 'a'){
+         BTLEserial.print("z");
+         Serial.println("And I have responded to Austin with the character 'z'");
+         call_response_start = false;
+      }
+     }
     }
     
+    if (first_connection && !phone_secure && !call_response_start){ //take the passcode and store it in EEPROM
+      while (BTLEserial.available()) {
+         char c = BTLEserial.read();
+         Serial.println(c);
+         if (c != ':'){
+           Serial.println("I am writing the passcode to my EEPROM nnow");
+           EEPROM.write(address, c - '0');
+           address = address+1;
+//           if (address == 4){
+//             address = 0;
+//           }
+         }
+         else{
+           Serial.println("Yo I have finished pairing and I am done writing to the EEPROM now. Phone is now secure.");
+           first_connection = false;
+           phone_secure = true;
+           BTLEserial.print("f");
+         }
+      }
+    }
+    
+   else if (!first_connection && !call_response_start){
+      if (!phone_secure){
+        while (BTLEserial.available()){
+         char c = BTLEserial.read();
+         if (c != ':'){
+           phone_str += c;
+           Serial.println(c);
+         }
+         else{
+           check = phone_str.toInt();  //this is the passcode the phone has sent me
+           Serial.println(check);
+           phone_str = "";
+           address = 0;
+           for (i=0; i<4; i++){
+             value = EEPROM.read(address);
+             phone_str += String(value);
+             address = address + 1;
+           }
+           
+           passcode = phone_str.toInt();
+           phone_str = "";
+           Serial.println(passcode);
+           if (check == passcode){
+             Serial.println("Fabulous, this is the phone I should give lock control too");
+             phone_secure = true;
+             BTLEserial.print("f");
+           }
+           else{
+             Serial.println("GET THE FUCK OUT BITCH THIS AINT YO LOCK");
+             phone_secure = false;
+             call_response_start = true;
+             BTLEserial.print("d");
+             }
+         }
+       }
+     }
+   }
+   
+   if (phone_secure){ 
     while (BTLEserial.available()) {
       char c = BTLEserial.read();
       //if (c != 'u' || c != 'l' || c!= 
@@ -108,12 +202,12 @@ void loop()
       //Serial.print(phone_str);
       
       if (c == 'u'){ 
-        //Serial.println("I am unlocking becuase of app input");
+        Serial.println("I am unlocking becuase of app input");
         pos = desired_pos;
         lock_state = "u";
         }
       else if (c == 'l'){ 
-        //Serial.println("I am locking because of app input");
+        Serial.println("I am locking because of app input");
         pos = 85;
         lock_state = "l";
         }
@@ -132,15 +226,15 @@ void loop()
           diff = current_rssi_avg - prev_rssi_avg;
           //current_rssi_val = rssi_val; 
           //diff = current_rssi_val - prev_rssi_val;
-          Serial.println("--------------------------------");
-          Serial.print("Current RSSI Avg: ");
-          Serial.println(current_rssi_avg);
+//          Serial.println("--------------------------------");
+//          Serial.print("Current RSSI Avg: ");
+//          Serial.println(current_rssi_avg);
           
           //Serial.println("");
           //Serial.print("Previous RSSI Avg: ");
           //Serial.println(prev_rssi_avg);
           
-          Serial.println("");
+//          Serial.println("");
           
           prev_rssi_avg = current_rssi_avg;
           //prev_rssi_val = current_rssi_val;
@@ -152,20 +246,20 @@ void loop()
           
           avg_diff = diffs.rolling(diff);
           
-          Serial.println("");
-          Serial.print("Avg Diff: ");
-          Serial.println(avg_diff);
-          Serial.println("");
+//          Serial.println("");
+//          Serial.print("Avg Diff: ");
+//          Serial.println(avg_diff);
+//          Serial.println("");
        }
                       
        if (current_rssi_avg <= rssi_lock_val && avg_diff < 0){
-             Serial.println("I am locking because of RSSI");
+//             Serial.println("I am locking because of RSSI");
              pos = 85;
              lock_state = "l";
           }
             
           else if (current_rssi_avg >= rssi_unlock_val && avg_diff > 0){
-              Serial.println("I am unlocking because of RSSI"); 
+//              Serial.println("I am unlocking because of RSSI"); 
               pos = desired_pos;
               lock_state = "u";
            }
@@ -175,9 +269,8 @@ void loop()
           delay(15);
         }
        }
-    
-
-    if (lock_state != prev_lock_state){
+       
+     if (lock_state != prev_lock_state){
        if (lock_state == ""){
          lock_state = "l";
          prev_lock_state = "l";
@@ -187,16 +280,20 @@ void loop()
         else{
           BTLEserial.print(lock_state);
           //BTLEserial.print(";");
-          Serial.println("");
-          Serial.print("I think the lock is currently: ");
-          Serial.print(lock_state);
-          Serial.println("");
-          Serial.println("--------------------------------");     
+//          Serial.println("");
+//          Serial.print("I think the lock is currently: ");
+//          Serial.print(lock_state);
+//          Serial.println("");
+//          Serial.println("--------------------------------");     
 
 //          Serial.println("");
           //Serial.print(";");
           prev_lock_state = lock_state;   
-          }    
         }
-      }
+    }
    }
+   else{}
+  }
+}
+   
+

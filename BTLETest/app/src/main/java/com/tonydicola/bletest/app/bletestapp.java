@@ -9,7 +9,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.util.Log;
-import android.widget.ImageButton;
 import android.widget.RemoteViews;
 
 
@@ -21,53 +20,42 @@ public class bletestapp extends AppWidgetProvider {
     String ble_state;
     Boolean mode;
     Boolean lock_state;
-    ImageButton lock_btn;
-    ImageButton mode_btn;
 
     @Override
     public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
         // There may be multiple widgets active, so update all of them
         Log.i("widget","onUpdate!");
-        final int N = appWidgetIds.length;
-        for (int i = 0; i < N; i++) {
-
+        for (int appWidgetId : appWidgetIds) {
             //updateAppWidget(context, appWidgetManager, appWidgetIds[i]);
-            SharedPreferences pref =  context.getSharedPreferences("ble", Activity.MODE_PRIVATE);
+            SharedPreferences pref = context.getSharedPreferences("ble", Activity.MODE_PRIVATE);
             ble_state = pref.getString("ble_state", "wrong pref name");
-            mode = pref.getBoolean("mode",true);
-            lock_state = pref.getBoolean("lock_state",true);
+            mode = pref.getBoolean("mode", true);
+            lock_state = pref.getBoolean("lock_state", true);
             RemoteViews remoteViews = new RemoteViews(context.getPackageName(), R.layout.bletestapp);
-            Log.i("widget",ble_state);
+            Log.i("widget", ble_state);
 
             if (lock_state) {
                 remoteViews.setImageViewResource(R.id.widget_lock, R.drawable.lock_icon);
-            }
-            else {
+            } else {
                 remoteViews.setImageViewResource(R.id.widget_lock, R.drawable.unlock_icon);
             }
             if (mode) {
                 remoteViews.setImageViewResource(R.id.widget_mode, R.drawable.on_icon);
-            }
-            else {
+            } else {
                 remoteViews.setImageViewResource(R.id.widget_mode, R.drawable.off_icon);
             }
-            if(ble_state.equals("connected")) {
+            if (ble_state.equals("connected")) {
                 remoteViews.setImageViewResource(R.id.background, R.drawable.background_connected);
-            }
-            else {
+            } else {
                 remoteViews.setImageViewResource(R.id.background, R.drawable.background_disconnected);
             }
-            remoteViews.setOnClickPendingIntent(R.id.widget_lock,getPendingSelfIntent(context,"lock"));
-            remoteViews.setOnClickPendingIntent(R.id.widget_mode,getPendingSelfIntent(context,"mode"));
-            appWidgetManager.updateAppWidget(appWidgetIds[i],remoteViews);
-
+            remoteViews.setOnClickPendingIntent(R.id.widget_lock, getPendingSelfIntent(context, "lock"));
+            remoteViews.setOnClickPendingIntent(R.id.widget_mode, getPendingSelfIntent(context, "mode"));
+            appWidgetManager.updateAppWidget(appWidgetId, remoteViews);
         }
-
-
     }
 
     protected PendingIntent getPendingSelfIntent(Context context, String action) {
-        Log.i("widget","pendingintent");
         Intent intent = new Intent(context, getClass());
         intent.setAction(action);
         return PendingIntent.getBroadcast(context, 0, intent, 0);
@@ -76,7 +64,6 @@ public class bletestapp extends AppWidgetProvider {
     @Override
     public void onEnabled(Context context) {
         // Enter relevant functionality for when the first widget is created
-        Log.i("widget","onEnable");
         super.onEnabled(context);
     }
 
@@ -96,7 +83,7 @@ public class bletestapp extends AppWidgetProvider {
         if ("lock".equals(intent.getAction())) {
             lock_state = MainActivity.toggle_lock(true);
             editor.putBoolean("lock_state",lock_state);
-            editor.commit();
+            editor.apply();
             if (lock_state) {
                 Log.i("widget","locked");
                 remoteViews.setImageViewResource(R.id.widget_lock, R.drawable.lock_icon);
@@ -108,7 +95,7 @@ public class bletestapp extends AppWidgetProvider {
         } else if ("mode".equals(intent.getAction())) {
             mode = MainActivity.toggle_mode(true);
             editor.putBoolean("mode",mode);
-            editor.commit();
+            editor.apply();
             if (mode) {
                 remoteViews.setImageViewResource(R.id.widget_mode, R.drawable.on_icon);
             }
@@ -117,20 +104,8 @@ public class bletestapp extends AppWidgetProvider {
             }
         }
         ComponentName a = new ComponentName(context,bletestapp.class);
-        (AppWidgetManager.getInstance(context)).updateAppWidget(a, remoteViews);
+        AppWidgetManager.getInstance(context).updateAppWidget(a, remoteViews);
         super.onReceive(context, intent);
-    }
-
-    static void updateAppWidget(Context context, AppWidgetManager appWidgetManager,
-                                int appWidgetId) {
-
-        //CharSequence widgetText = context.getString(R.string.appwidget_text);
-        // Construct the RemoteViews object
-        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.bletestapp);
-       // views.setTextViewText(R.id.appwidget_text, widgetText);
-
-        // Instruct the widget manager to update the widget
-        appWidgetManager.updateAppWidget(appWidgetId, views);
     }
 }
 

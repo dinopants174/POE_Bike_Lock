@@ -81,7 +81,7 @@ public class bletestapp extends AppWidgetProvider {
         boolean lock_state;
         boolean mode;
         if ("lock".equals(intent.getAction())) {
-            lock_state = MainActivity.toggle_lock(true);
+            lock_state = MainActivity.toggleLock(true);
             editor.putBoolean("lock_state",lock_state);
             editor.apply();
             if (lock_state) {
@@ -93,7 +93,7 @@ public class bletestapp extends AppWidgetProvider {
                 remoteViews.setImageViewResource(R.id.widget_lock, R.drawable.unlock_icon);
             }
         } else if ("mode".equals(intent.getAction())) {
-            mode = MainActivity.toggle_mode(true);
+            mode = MainActivity.toggleMode(true);
             editor.putBoolean("mode",mode);
             editor.apply();
             if (mode) {
@@ -103,8 +103,8 @@ public class bletestapp extends AppWidgetProvider {
                 remoteViews.setImageViewResource(R.id.widget_mode, R.drawable.off_icon);
             }
         }
-        ComponentName a = new ComponentName(context,bletestapp.class);
-        AppWidgetManager.getInstance(context).updateAppWidget(a, remoteViews);
+        ComponentName component_name = new ComponentName(context,bletestapp.class);
+        AppWidgetManager.getInstance(context).updateAppWidget(component_name, remoteViews);
         super.onReceive(context, intent);
     }
 }

@@ -238,10 +238,10 @@ public class MainActivity extends Activity {
                 String input = characteristic.getStringValue(0);
                 Log.i("arduino in comms", input);
                 if (input.equals("l")) {
-                    update_lock_button(true);
+                    updateLockButton(true);
                 }
                 else if (input.equals("u")) {
-                    update_lock_button(false);
+                    updateLockButton(false);
                 }
                 else if (input.equals("z")){
                     onResponse();
@@ -282,12 +282,12 @@ public class MainActivity extends Activity {
 
     View.OnClickListener toggle_handler = new View.OnClickListener(){
         public void onClick(View v){
-            toggle_lock(false);
+            toggleLock(false);
             updateState();
         }
     };
 
-    public static boolean toggle_mode(boolean called_by_widget){
+    public static boolean toggleMode(boolean called_by_widget){
         if (called_by_widget) {
             mode_toggle.setChecked(!mode_toggle.isChecked());
         }
@@ -297,7 +297,7 @@ public class MainActivity extends Activity {
     //on click listener for mode toggle button
     View.OnClickListener mode_toggle_handler = new View.OnClickListener() {
         public void onClick(View v) {
-            toggle_mode(false);
+            toggleMode(false);
             updateState();
         }
     };
@@ -364,7 +364,7 @@ public class MainActivity extends Activity {
         });
     }
 
-    private void update_lock_button(final boolean locked){
+    private void updateLockButton(final boolean locked){
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -373,7 +373,7 @@ public class MainActivity extends Activity {
         });
     }
 
-    public static boolean toggle_lock(boolean called_by_widget){
+    public static boolean toggleLock(boolean called_by_widget){
         Log.i("toggle", "toggle pressed");
         if (called_by_widget) {
             lock_toggle.setChecked(!lock_toggle.isChecked());

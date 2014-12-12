@@ -108,15 +108,14 @@ void loop()
     }
     if (status == ACI_EVT_DISCONNECTED) {
         Serial.println(F("* Disconnected or advertising timed out"));
+    }    
+    if (status == ACI_EVT_DEVICE_STARTED && laststatus == ACI_EVT_CONNECTED){
+      phone_secure = false;
+      call_response_start = true;
     }
-
     laststatus = status;
   }
   
-  if (status == ACI_EVT_DISCONNECTED){
-    phone_secure = false;
-    call_response_start = true;
-  }
 
   if (status == ACI_EVT_CONNECTED) {
     if (call_response_start){
@@ -163,6 +162,7 @@ void loop()
          }
          else{
            check = phone_str.toInt();  //this is the passcode the phone has sent me
+           Serial.print("You sent me: ");
            Serial.println(check);
            phone_str = "";
            address = 0;
@@ -174,6 +174,7 @@ void loop()
            
            passcode = phone_str.toInt();
            phone_str = "";
+           Serial.print("The passcode in my memory is: ");
            Serial.println(passcode);
            if (check == passcode){
              Serial.println("Fabulous, this is the phone I should give lock control too");
@@ -253,13 +254,13 @@ void loop()
        }
                       
        if (current_rssi_avg <= rssi_lock_val && avg_diff < 0){
-//             Serial.println("I am locking because of RSSI");
+             Serial.println("I am locking because of RSSI");
              pos = 85;
              lock_state = "l";
           }
             
           else if (current_rssi_avg >= rssi_unlock_val && avg_diff > 0){
-//              Serial.println("I am unlocking because of RSSI"); 
+              Serial.println("I am unlocking because of RSSI"); 
               pos = desired_pos;
               lock_state = "u";
            }

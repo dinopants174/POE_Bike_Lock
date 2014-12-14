@@ -25,8 +25,8 @@ boolean call_response_start = true;
 Adafruit_BLE_UART BTLEserial = Adafruit_BLE_UART(ADAFRUITBLE_REQ, ADAFRUITBLE_RDY, ADAFRUITBLE_RST);
 
 Servo servo;
-int pos = 85;
-int desired_pos = 70;  //change this depending on where servo needs to go for unlock command
+int pos = 60;
+int desired_pos = 40;  //change this depending on where servo needs to go for unlock command
 
 String phone_str = "";
 int rssi_val = 0;
@@ -108,10 +108,14 @@ void loop()
     }
     if (status == ACI_EVT_DISCONNECTED) {
         //Serial.println(F("* Disconnected or advertising timed out"));
+        phone_secure = false;
+        call_response_start = true;
+        servo.write(60);
     }    
     if (status == ACI_EVT_DEVICE_STARTED && laststatus == ACI_EVT_CONNECTED){
       phone_secure = false;
       call_response_start = true;
+      servo.write(60);
     }
     laststatus = status;
   }
@@ -195,13 +199,6 @@ void loop()
    if (phone_secure){ 
     while (BTLEserial.available()) {
       char c = BTLEserial.read();
-      //if (c != 'u' || c != 'l' || c!= 
-      //Serial.print(c);
-      
-      //Serial.print(phone_str);
-      //phone_str = BTLEserial.readString();
-      //Serial.print(phone_str);
-      
       if (c == 'u'){ 
         //Serial.println("I am unlocking becuase of app input");
         pos = desired_pos;
@@ -209,7 +206,7 @@ void loop()
         }
       else if (c == 'l'){ 
         //Serial.println("I am locking because of app input");
-        pos = 85;
+        pos = 60;
         lock_state = "l";
         }
       else{
@@ -255,7 +252,7 @@ void loop()
                       
        if (current_rssi_avg <= rssi_lock_val && avg_diff < 0){
              //Serial.println("I am locking because of RSSI");
-             pos = 85;
+             pos = 60;
              lock_state = "l";
           }
             
@@ -264,11 +261,12 @@ void loop()
               pos = desired_pos;
               lock_state = "u";
            }
-         
+        
+      }
           //lock_state = "l";  
           servo.write(pos);
           delay(15);
-        }
+        
        }
        
      if (lock_state != prev_lock_state){
@@ -295,4 +293,4 @@ void loop()
    else{}
   }
 }
-   
+

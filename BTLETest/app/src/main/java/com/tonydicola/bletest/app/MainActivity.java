@@ -61,6 +61,8 @@ public class MainActivity extends Activity {
     private static BluetoothGattCharacteristic tx;
     private BluetoothGattCharacteristic rx;
 
+    private static int REQUEST_ENABLE_BT = 1;
+
     String rssi_string;
     static String  unlock_command = "u";
     static String lock_command = "l";
@@ -113,6 +115,10 @@ public class MainActivity extends Activity {
 
         adapter = BluetoothAdapter.getDefaultAdapter();
         Log.i("ble Connect", "Scanning");
+        if (!adapter.isEnabled()) {
+            Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+            startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
+        }
         adapter.startLeScan(scanCallback);
 
     }
@@ -138,6 +144,15 @@ public class MainActivity extends Activity {
                 call_timer.purge();
                 call = true;
             }
+        }
+    }
+
+    @Override
+    protected void onResume(){
+        super.onResume();
+        if (!adapter.isEnabled()) {
+            Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+            startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
         }
     }
 
@@ -384,7 +399,9 @@ public class MainActivity extends Activity {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                lock_toggle.setChecked(locked);
+                if (lock_toggle.isChecked() != locked){
+                    lock_toggle.setChecked(locked);
+                }
             }
         });
     }

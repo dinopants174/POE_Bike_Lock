@@ -276,7 +276,6 @@ void loop()
          lock_state = "l";
          prev_lock_state = "l";
          BTLEserial.print(lock_state);
-         //BTLEserial.print("l");
         }
         else{
           BTLEserial.print(lock_state);

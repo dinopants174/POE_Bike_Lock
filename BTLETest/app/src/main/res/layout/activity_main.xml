@@ -11,13 +11,6 @@
 
     tools:context="com.tonydicola.bletest.app.MainActivity">
 
-    <TextView
-        android:id="@+id/rssi_text"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentRight="true"
-        android:layout_alignParentTop="true" />
-
     <ToggleButton
         android:id="@+id/lock_state"
         android:layout_width="300dp"
@@ -36,6 +29,14 @@
         android:textOn=""
         android:checked="false"
         android:layout_alignParentBottom="true"
-        android:layout_alignEnd="@+id/rssi_text" />
+        android:layout_alignEnd="@+id/settings_button" />
+
+    <Button
+        android:layout_width="12.67dp"
+        android:layout_height="23.33dp"
+        android:id="@+id/settings_button"
+        android:background="@drawable/settings"
+        android:layout_alignParentTop="true"
+        android:layout_toEndOf="@+id/lock_state" />
 
 </RelativeLayout>

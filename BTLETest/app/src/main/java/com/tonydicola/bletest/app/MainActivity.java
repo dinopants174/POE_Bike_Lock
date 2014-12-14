@@ -14,8 +14,10 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.util.Log;
 import android.view.View;
+import android.widget.Button;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.ToggleButton;
@@ -47,9 +49,9 @@ public class MainActivity extends Activity {
     private TimerTask call_task;
 
     // UI elements
-    private TextView rssi_text_view;
     private static ToggleButton lock_toggle;
     private static ToggleButton mode_toggle; //for auto-mode on/off
+    private static Button settings_button;
     private RelativeLayout layout;
 
 
@@ -63,8 +65,10 @@ public class MainActivity extends Activity {
     static String  unlock_command = "u";
     static String lock_command = "l";
     String ble_state = "disconnected";
-    String passcode = "1112"+":";
     String   call_char = "a";
+    String passcode;
+
+    private List<BluetoothDevice> blacklist = new ArrayList<BluetoothDevice>();
 
 
     // OnCreate, called once to initialize the activity.
@@ -74,6 +78,9 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
         // Grab references to UI elements.
         Log.i("test", "starting");
+        SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(this);
+        passcode = sharedPref.getString("Passcode", "");
+        passcode = passcode + ":";
         read_rssi_task = new TimerTask() {
             @Override
             public void run() {
@@ -88,7 +95,8 @@ public class MainActivity extends Activity {
             }
         };
 
-        rssi_text_view = (TextView) findViewById(R.id.rssi_text);
+        settings_button = (Button) findViewById(R.id.settings_button);
+        settings_button.setOnClickListener(settings_handler);
 
         layout = (RelativeLayout) findViewById(R.id.layout);
         changeColor(ble_state);
@@ -123,6 +131,12 @@ public class MainActivity extends Activity {
                 read_rssi_task.cancel();
                 rssi_timer.cancel();
                 set_timer = true;
+            }
+            if (call_timer != null) {
+                call_task.cancel();
+                call_timer.cancel();
+                call_timer.purge();
+                call = true;
             }
         }
     }
@@ -195,16 +209,15 @@ public class MainActivity extends Activity {
         @Override
         public void onReadRemoteRssi(BluetoothGatt gatt, int rssi, int status) {
             if (status == BluetoothGatt.GATT_SUCCESS && mode) { //mode condition added
-                //Log.i("RSSI Callback", String.format("BluetoothGatt ReadRssi[%d]", rssi));
+                Log.i("RSSI Callback", String.format("BluetoothGatt ReadRssi[%d]", rssi));
                 rssi_string = "" + rssi + ";";
-                writeRSSI(rssi_string);
                 if (tx == null) {
                     // Do nothing if there is no device or message to send.
                     Log.i("RSSI Callback", "TX is empty");
                 }
                 //Log.i("RSSI Callback","sending");
-                //tx.setValue(rssi_string.getBytes(Charset.forName("UTF-8")));
-                //gatt.writeCharacteristic(tx);
+                tx.setValue(rssi_string.getBytes(Charset.forName("UTF-8")));
+                gatt.writeCharacteristic(tx);
             }
         }
 
@@ -239,15 +252,14 @@ public class MainActivity extends Activity {
                 Log.i("arduino in comms", input);
                 if (input.equals("l")) {
                     updateLockButton(true);
-                }
-                else if (input.equals("u")) {
+                } else if (input.equals("u")) {
                     updateLockButton(false);
-                }
-                else if (input.equals("z")){
+                } else if (input.equals("z")) {
                     onResponse();
-                }
-                else if (input.equals("f")){
+                } else if (input.equals("f")) {
                     onAuthentication();
+                } else if (input.equals("d")){
+                    onDeauthentication();
                 }
 
                 updateState();
@@ -266,19 +278,31 @@ public class MainActivity extends Activity {
             if (parseUUIDs(bytes).contains(UART_UUID)) {
                 // Found a device, stop the scan.
                 adapter.stopLeScan(scanCallback);
-                Log.i("ble Connect", "Found Device");
-                ble_state = "found";
-                changeColor(ble_state);
                 // Connect to the device.
                 // Control flow will now go to the callback functions when BTLE events occur.
                 // bluetoothDevice.createBond();
-                gatt = bluetoothDevice.connectGatt(getApplicationContext(), false, callback);
+                if (!blacklist.contains(bluetoothDevice)) {
+                    gatt = bluetoothDevice.connectGatt(getApplicationContext(), true, callback);
+                    ble_state = "found";
 
-
+                }
+                else{
+                    adapter.startLeScan(scanCallback);
+                    Log.i("Deauthentication", "Attempted to access blacklisted device");
+                    ble_state = "disconnected";
+                }
+                Log.i("ble Connect", "Found Device");
+                changeColor(ble_state);
             }
         }
     };
 
+    View.OnClickListener settings_handler = new View.OnClickListener(){
+        public void onClick(View v){
+            Intent i = new Intent(getApplicationContext(), SettingsActivity.class);
+            startActivity(i);
+        }
+    };
 
     View.OnClickListener toggle_handler = new View.OnClickListener(){
         public void onClick(View v){
@@ -355,14 +379,6 @@ public class MainActivity extends Activity {
     }
 
     //UI Thread Section
-    private void writeRSSI(final CharSequence text) {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                rssi_text_view.setText(text);
-            }
-        });
-    }
 
     private void updateLockButton(final boolean locked){
         runOnUiThread(new Runnable() {
@@ -464,7 +480,38 @@ public class MainActivity extends Activity {
         }
 
     }
+
+    public void onDeauthentication(){
+        Log.i("Deauthentication", "Deauthenticated");
+        if (gatt != null) {
+            if(!blacklist.contains(gatt.getDevice())){
+                blacklist.add(gatt.getDevice());
+            }
+            ble_state = "disconnected";
+            changeColor(ble_state);
+            gatt.disconnect();
+            gatt.close();
+            gatt = null;
+            tx = null;
+            rx = null;
+            if (rssi_timer != null) {
+                read_rssi_task.cancel();
+                rssi_timer.cancel();
+                set_timer = true;
+            }
+            if (call_timer != null) {
+                call_task.cancel();
+                call_timer.cancel();
+                call_timer.purge();
+                call = true;
+            }
+        }
+        adapter.startLeScan(scanCallback);
+    }
     public void sendPasscode(){
+        SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(this);
+        passcode = sharedPref.getString("Passcode", "");
+        passcode = passcode + ":";
         if(tx != null) {
             Log.i("Sending passcode", passcode);
             tx.setValue(passcode.getBytes(Charset.forName("UTF-8")));
@@ -485,6 +532,5 @@ public class MainActivity extends Activity {
             Log.i("Sending call", "Couldn't Send");
         }
     }
-
 }
 

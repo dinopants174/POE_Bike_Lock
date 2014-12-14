@@ -1,0 +1,15 @@
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+
+    <!-- NOTE: EditTextPreference accepts EditText attributes. -->
+    <!-- NOTE: EditTextPreference's summary should be set to its value by the activity code. -->
+    <EditTextPreference
+        android:key="Passcode"
+        android:title="Change Passcode"
+        android:defaultValue="@string/Passcode"
+        android:selectAllOnFocus="true"
+        android:inputType="numberPassword"
+        android:singleLine="true"
+        android:maxLines="1" />
+
+</PreferenceScreen>

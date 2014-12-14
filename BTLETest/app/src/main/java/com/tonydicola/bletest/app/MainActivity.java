@@ -375,6 +375,7 @@ public class MainActivity extends Activity {
 
     public static boolean toggleLock(boolean called_by_widget){
         Log.i("toggle", "toggle pressed");
+        // It's because clicking widget's button doesn't toggle the "real" button.
         if (called_by_widget) {
             lock_toggle.setChecked(!lock_toggle.isChecked());
         }
@@ -412,8 +413,9 @@ public class MainActivity extends Activity {
         });
     }
 
-    //Widget Section
+    // Widget Section
     public void updateState() {
+        // Load SharedPreference and save current states to it.
         SharedPreferences pref =  this.getSharedPreferences("ble", Activity.MODE_PRIVATE);
         SharedPreferences.Editor editor = pref.edit();
         editor.putBoolean("mode",mode);
@@ -421,6 +423,7 @@ public class MainActivity extends Activity {
         editor.putString("ble_state",ble_state);
         editor.apply();
 
+        // Call onUpdate function of the widget.
         AppWidgetManager mgr = AppWidgetManager.getInstance(this);
         Intent update = new Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
         update.setClass(this,bletestapp.class);

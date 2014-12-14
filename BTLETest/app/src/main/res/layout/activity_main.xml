@@ -11,6 +11,7 @@
 
     tools:context="com.tonydicola.bletest.app.MainActivity">
 
+    <!--Lock Toggle Button-->
     <ToggleButton
         android:id="@+id/lock_state"
         android:layout_width="300dp"
@@ -20,6 +21,8 @@
         android:textOn=""
         android:layout_centerVertical="true"
         android:layout_centerHorizontal="true" />
+
+    <!--Auto Mode Toggle Button-->
     <ToggleButton
         android:id="@+id/mode_state"
         android:layout_width="75dp"
@@ -31,6 +34,7 @@
         android:layout_alignParentBottom="true"
         android:layout_alignEnd="@+id/settings_button" />
 
+    <!--Settings Button-->
     <Button
         android:layout_width="12.67dp"
         android:layout_height="23.33dp"

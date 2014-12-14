@@ -3,12 +3,15 @@
     android:orientation="vertical" android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+    <!-- Back Button-->
     <Button
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:id="@+id/settings_button"
         android:background="@drawable/back_arrow"
         android:layout_marginTop="10dp" />
+
+    <!--Settings Fragment-->
     <fragment android:name="com.tonydicola.bletest.app.SettingsActivity$SettingsFragment"
         android:id="@+id/list"
         android:layout_width="wrap_content"

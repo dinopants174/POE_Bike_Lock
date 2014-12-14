@@ -45,17 +45,15 @@ public class SettingsActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        // Display the fragment as the main content.
-        /*getFragmentManager().beginTransaction()
-                .replace(android.R.id.content, new SettingsFragment())
-                .commit();*/
+        //set layout
         setContentView(R.layout.settings_activity);
 
+        //Init back button
         back_button = (Button) findViewById(R.id.settings_button);
         back_button.setOnClickListener(back_handler);
     }
 
+    //On click listener for back button
     View.OnClickListener back_handler = new View.OnClickListener(){
         public void onClick(View v){
             Intent i = new Intent(getApplicationContext(), MainActivity.class);
@@ -63,6 +61,7 @@ public class SettingsActivity extends Activity {
         }
     };
 
+    //Create preference Fragment class
     public static class SettingsFragment extends PreferenceFragment {
         @Override
         public void onCreate(Bundle savedInstanceState) {

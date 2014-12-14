@@ -41,11 +41,14 @@ public class MainActivity extends Activity {
     public static UUID RX_UUID = UUID.fromString("6E400003-B5A3-F393-E0A9-E50E24DCCA9E");
     // UUID for the BTLE client characteristic which is necessary for notifications.
     public static UUID CLIENT_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
+
+    // Rssi timer task variables
     private Timer rssi_timer;
     private Boolean set_timer = true;
     private TimerTask read_rssi_task;
     private static Boolean mode = true; //mode
 
+    // Call Response timer task variables
     private Timer call_timer;
     private Boolean call = true;
     private TimerTask call_task;
@@ -57,21 +60,24 @@ public class MainActivity extends Activity {
     private RelativeLayout layout;
 
 
-    // BTLE state
+    // BTLE Variables
     private BluetoothAdapter adapter;
     private static BluetoothGatt gatt;
     private static BluetoothGattCharacteristic tx;
     private BluetoothGattCharacteristic rx;
-
     private static int REQUEST_ENABLE_BT = 1;
+    String ble_state = "disconnected";
 
+
+    // Call Response Constants
     String rssi_string;
     static String  unlock_command = "u";
     static String lock_command = "l";
-    String ble_state = "disconnected";
     String   call_char = "a";
+
     String passcode;
 
+    //Device Blacklist
     private List<BluetoothDevice> blacklist = new ArrayList<BluetoothDevice>();
 
 
@@ -79,12 +85,16 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        //Apply layout settings
         setContentView(R.layout.activity_main);
         // Grab references to UI elements.
         Log.i("test", "starting");
+        //Load passcode from file
         SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(this);
         passcode = sharedPref.getString("Passcode", "");
         passcode = passcode + ":";
+
+        //Initialize rssi timer
         read_rssi_task = new TimerTask() {
             @Override
             public void run() {
@@ -99,28 +109,36 @@ public class MainActivity extends Activity {
             }
         };
 
+        //Initialize UI Elements
         settings_button = (Button) findViewById(R.id.settings_button);
         settings_button.setOnClickListener(settings_handler);
 
-        layout = (RelativeLayout) findViewById(R.id.layout);
-        changeColor(ble_state);
         lock_toggle = (ToggleButton) findViewById(R.id.lock_state);
         lock_toggle.setOnClickListener(toggle_handler);
         lock_toggle.setChecked(true);
 
-        //for mode toggle button
+            //for mode toggle button
         mode_toggle = (ToggleButton) findViewById(R.id.mode_state);
         mode_toggle.setOnClickListener(mode_toggle_handler);
         mode_toggle.setChecked(true); //we probably save the mode last time to local drive.\
         updateState();
+
+        layout = (RelativeLayout) findViewById(R.id.layout);
+        changeColor(ble_state);
+
         Log.i("test", "starting");
 
+        // Initialize adapter
         adapter = BluetoothAdapter.getDefaultAdapter();
         Log.i("ble Connect", "Scanning");
+
+        //Force turning on Bluetooth
         if (!adapter.isEnabled()) {
             Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
         }
+
+        // Start Initial scan
         adapter.startLeScan(scanCallback);
 
     }
@@ -135,6 +153,8 @@ public class MainActivity extends Activity {
             gatt = null;
             tx = null;
             rx = null;
+
+            // Destroy timers
             if (rssi_timer != null) {
                 read_rssi_task.cancel();
                 rssi_timer.cancel();
@@ -152,6 +172,8 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume(){
         super.onResume();
+
+        // Force bluetooth enable
         if (!adapter.isEnabled()) {
             Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
@@ -165,6 +187,7 @@ public class MainActivity extends Activity {
         public void onConnectionStateChange(BluetoothGatt gatt1, int status, int newState) {
             super.onConnectionStateChange(gatt, status, newState);
             if (status == BluetoothGatt.GATT_SUCCESS) {
+                //If connected
                 if (newState == BluetoothGatt.STATE_CONNECTED) {
                     gatt = gatt1;
                     // Discover services.
@@ -188,15 +211,19 @@ public class MainActivity extends Activity {
                             Log.i("Call Response Protocol", "Sending Call");
                         }
 
+                    //Discover services and set color
                     gatt.discoverServices();
                     ble_state = "connected";
                     changeColor(ble_state);
                     }
+
+                // If disconnected
                 else if (newState == BluetoothGatt.STATE_DISCONNECTED) {
-                    //destroy Timer
                     Log.i("ble Connect", "Disconnected");
+                    //Change state and color
                     ble_state = "disconnected";
                     changeColor(ble_state);
+                    //destroy Timers
                     if (rssi_timer != null) {
                         read_rssi_task.cancel();
                         rssi_timer.cancel();
@@ -209,6 +236,7 @@ public class MainActivity extends Activity {
                         call_timer.purge();
                         call = true;
                     }
+                    //Destroy connection
                     if(gatt != null) {
                         gatt.disconnect();
                         gatt.close();
@@ -216,6 +244,7 @@ public class MainActivity extends Activity {
                         tx = null;
                         rx = null;
                     }
+                    //Start new scan
                     Log.i("ble Connect", "Scanning");
                     adapter.startLeScan(scanCallback);
                 }
@@ -233,12 +262,11 @@ public class MainActivity extends Activity {
                     Log.i("RSSI Callback", "TX is empty");
                 }
                 //Log.i("RSSI Callback","sending");
+                //Set and send rssi value
                 tx.setValue(rssi_string.getBytes(Charset.forName("UTF-8")));
                 gatt.writeCharacteristic(tx);
             }
         }
-
-        //then put
 
         // Called when services have been discovered on the remote device.
         // It seems to be necessary to wait for this discovery to occur before
@@ -267,15 +295,24 @@ public class MainActivity extends Activity {
             if (characteristic.getUuid().equals(RX_UUID)) {
                 String input = characteristic.getStringValue(0);
                 Log.i("arduino in comms", input);
+                // If Arduino locked
                 if (input.equals("l")) {
                     updateLockButton(true);
-                } else if (input.equals("u")) {
+                }
+                // If Arduino unlocked
+                else if (input.equals("u")) {
                     updateLockButton(false);
-                } else if (input.equals("z")) {
+                }
+                // If call received
+                else if (input.equals("z")) {
                     onResponse();
-                } else if (input.equals("f")) {
+                }
+                // If authenticated
+                else if (input.equals("f")) {
                     onAuthentication();
-                } else if (input.equals("d")){
+                }
+                // If deauthenticated
+                else if (input.equals("d")){
                     onDeauthentication();
                 }
 
@@ -297,13 +334,14 @@ public class MainActivity extends Activity {
                 adapter.stopLeScan(scanCallback);
                 // Connect to the device.
                 // Control flow will now go to the callback functions when BTLE events occur.
-                // bluetoothDevice.createBond();
+
+                //Check if device on blacklist before connecting
                 if (!blacklist.contains(bluetoothDevice)) {
                     gatt = bluetoothDevice.connectGatt(getApplicationContext(), true, callback);
                     ble_state = "found";
-
                 }
                 else{
+                    // start new scan, trying to connect to bad lock
                     adapter.startLeScan(scanCallback);
                     Log.i("Deauthentication", "Attempted to access blacklisted device");
                     ble_state = "disconnected";
@@ -314,8 +352,10 @@ public class MainActivity extends Activity {
         }
     };
 
+    //On click listeners for buttons
     View.OnClickListener settings_handler = new View.OnClickListener(){
         public void onClick(View v){
+            //Start settings activity
             Intent i = new Intent(getApplicationContext(), SettingsActivity.class);
             startActivity(i);
         }
@@ -323,12 +363,14 @@ public class MainActivity extends Activity {
 
     View.OnClickListener toggle_handler = new View.OnClickListener(){
         public void onClick(View v){
+            //toggle that lock!
             toggleLock(false);
             updateState();
         }
     };
 
     public static boolean toggleMode(boolean called_by_widget){
+        //toggle mode
         if (called_by_widget) {
             mode_toggle.setChecked(!mode_toggle.isChecked());
         }
@@ -398,11 +440,13 @@ public class MainActivity extends Activity {
     //UI Thread Section
 
     private void updateLockButton(final boolean locked){
+        // Force a change of the button (caused by arduino)
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
                 if (lock_toggle.isChecked() != locked){
                     lock_toggle.setChecked(locked);
+                    //Vibrate
                     Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
                     v.vibrate(500);
                 }
@@ -418,6 +462,7 @@ public class MainActivity extends Activity {
         }
         boolean locked = !lock_toggle.isChecked();
 
+        //Send toggle commands to the arduino
         if(tx != null) {
             if(locked) {
                 tx.setValue(lock_command.getBytes(Charset.forName("UTF-8")));
@@ -434,6 +479,7 @@ public class MainActivity extends Activity {
     }
 
     private void changeColor(final String state){
+        //Change the color of the background based off of connection state
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -472,6 +518,7 @@ public class MainActivity extends Activity {
     //State controll section
 
     public void onResponse(){
+        //Cancel call timer
         Log.i("Call Response Protocol", "Received Call");
         if (call_timer != null) {
             call_task.cancel();
@@ -479,10 +526,12 @@ public class MainActivity extends Activity {
             call_timer.purge();
             call = true;
         }
+        //Send passcode
         sendPasscode();
     }
 
     public void onAuthentication(){
+        //schedule rssi timer
         if (set_timer) {
             if (rssi_timer != null) {
                 read_rssi_task.cancel();
@@ -504,12 +553,15 @@ public class MainActivity extends Activity {
 
     public void onDeauthentication(){
         Log.i("Deauthentication", "Deauthenticated");
+        // Add device to blacklist if its not there already
         if (gatt != null) {
             if(!blacklist.contains(gatt.getDevice())){
                 blacklist.add(gatt.getDevice());
             }
+            //Change connection state
             ble_state = "disconnected";
             changeColor(ble_state);
+            //End timers and connection
             gatt.disconnect();
             gatt.close();
             gatt = null;
@@ -530,9 +582,12 @@ public class MainActivity extends Activity {
         adapter.startLeScan(scanCallback);
     }
     public void sendPasscode(){
+        //Read passcode from prefs
         SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(this);
         passcode = sharedPref.getString("Passcode", "");
         passcode = passcode + ":";
+
+        //Send Passcode
         if(tx != null) {
             Log.i("Sending passcode", passcode);
             tx.setValue(passcode.getBytes(Charset.forName("UTF-8")));
@@ -544,6 +599,7 @@ public class MainActivity extends Activity {
     }
 
     public void sendCall(){
+        //Send call character if possible
         if(tx != null) {
             Log.i("Sending call", call_char);
             tx.setValue(call_char.getBytes(Charset.forName("UTF-8")));

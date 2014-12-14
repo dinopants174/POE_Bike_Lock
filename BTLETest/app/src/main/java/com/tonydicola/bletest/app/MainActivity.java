@@ -145,11 +145,11 @@ public class MainActivity extends Activity {
     private BluetoothGattCallback callback = new BluetoothGattCallback() {
         // Called whenever the device connection state changes, i.e. from disconnected to connected.
         @Override
-        public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+        public void onConnectionStateChange(BluetoothGatt gatt1, int status, int newState) {
             super.onConnectionStateChange(gatt, status, newState);
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 if (newState == BluetoothGatt.STATE_CONNECTED) {
-                    MainActivity.this.gatt = gatt;
+                    gatt = gatt1;
                     // Discover services.
                     Log.i("ble Connect", "Connected");
                     // schedule call response here
@@ -192,10 +192,10 @@ public class MainActivity extends Activity {
                         call_timer.purge();
                         call = true;
                     }
-                    if(MainActivity.this.gatt != null) {
-                        MainActivity.this.gatt.disconnect();
-                        MainActivity.this.gatt.close();
-                        MainActivity.this.gatt = null;
+                    if(gatt != null) {
+                        gatt.disconnect();
+                        gatt.close();
+                        gatt = null;
                         tx = null;
                         rx = null;
                     }
@@ -214,7 +214,6 @@ public class MainActivity extends Activity {
                 if (tx == null) {
                     // Do nothing if there is no device or message to send.
                     Log.i("RSSI Callback", "TX is empty");
-                    return;
                 }
                 //Log.i("RSSI Callback","sending");
                 tx.setValue(rssi_string.getBytes(Charset.forName("UTF-8")));
@@ -252,9 +251,9 @@ public class MainActivity extends Activity {
                 String input = characteristic.getStringValue(0);
                 Log.i("arduino in comms", input);
                 if (input.equals("l")) {
-                    update_lock_button(true);
+                    updateLockButton(true);
                 } else if (input.equals("u")) {
-                    update_lock_button(false);
+                    updateLockButton(false);
                 } else if (input.equals("z")) {
                     onResponse();
                 } else if (input.equals("f")) {
@@ -307,12 +306,12 @@ public class MainActivity extends Activity {
 
     View.OnClickListener toggle_handler = new View.OnClickListener(){
         public void onClick(View v){
-            toggle_lock(false);
+            toggleLock(false);
             updateState();
         }
     };
 
-    public static boolean toggle_mode(boolean called_by_widget){
+    public static boolean toggleMode(boolean called_by_widget){
         if (called_by_widget) {
             mode_toggle.setChecked(!mode_toggle.isChecked());
         }
@@ -322,7 +321,7 @@ public class MainActivity extends Activity {
     //on click listener for mode toggle button
     View.OnClickListener mode_toggle_handler = new View.OnClickListener() {
         public void onClick(View v) {
-            toggle_mode(false);
+            toggleMode(false);
             updateState();
         }
     };
@@ -364,7 +363,6 @@ public class MainActivity extends Activity {
                         } catch (IndexOutOfBoundsException e) {
                             // Defensive programming.
                             Log.e("UUID Parsing", e.toString());
-                            continue;
                         } finally {
                             // Move the offset to read the next uuid.
                             offset += 15;
@@ -382,7 +380,7 @@ public class MainActivity extends Activity {
 
     //UI Thread Section
 
-    private void update_lock_button(final boolean locked){
+    private void updateLockButton(final boolean locked){
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -391,7 +389,7 @@ public class MainActivity extends Activity {
         });
     }
 
-    public static boolean toggle_lock(boolean called_by_widget){
+    public static boolean toggleLock(boolean called_by_widget){
         Log.i("toggle", "toggle pressed");
         if (called_by_widget) {
             lock_toggle.setChecked(!lock_toggle.isChecked());
@@ -437,7 +435,7 @@ public class MainActivity extends Activity {
         editor.putBoolean("mode",mode);
         editor.putBoolean("lock_state",lock_toggle.isChecked());
         editor.putString("ble_state",ble_state);
-        editor.commit();
+        editor.apply();
 
         AppWidgetManager mgr = AppWidgetManager.getInstance(this);
         Intent update = new Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
@@ -445,15 +443,6 @@ public class MainActivity extends Activity {
         update.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS,mgr.getAppWidgetIds(new ComponentName(this,bletestapp.class)));
         this.sendBroadcast(update);
         Log.i("update","updated");
-    }
-
-    public void updateWidget() {
-        AppWidgetManager mgr = AppWidgetManager.getInstance(this);
-        Intent update = new Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
-        update.setClass(this,bletestapp.class);
-        update.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS,mgr.getAppWidgetIds(new ComponentName(this,bletestapp.class)));
-        this.sendBroadcast(update);
-        this.finish();
     }
 
     //State controll section
@@ -479,7 +468,7 @@ public class MainActivity extends Activity {
             read_rssi_task = new TimerTask() {
                 @Override
                 public void run() {
-                    MainActivity.this.gatt.readRemoteRssi();
+                    gatt.readRemoteRssi();
                 }
             };
             rssi_timer = new Timer();

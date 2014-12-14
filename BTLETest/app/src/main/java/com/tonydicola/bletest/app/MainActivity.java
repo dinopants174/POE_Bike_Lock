@@ -10,10 +10,12 @@ import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattDescriptor;
 import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.os.Vibrator;
 import android.preference.PreferenceManager;
 import android.util.Log;
 import android.view.View;
@@ -401,6 +403,8 @@ public class MainActivity extends Activity {
             public void run() {
                 if (lock_toggle.isChecked() != locked){
                     lock_toggle.setChecked(locked);
+                    Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+                    v.vibrate(500);
                 }
             }
         });
@@ -412,7 +416,7 @@ public class MainActivity extends Activity {
         if (called_by_widget) {
             lock_toggle.setChecked(!lock_toggle.isChecked());
         }
-        boolean locked = lock_toggle.isChecked();
+        boolean locked = !lock_toggle.isChecked();
 
         if(tx != null) {
             if(locked) {

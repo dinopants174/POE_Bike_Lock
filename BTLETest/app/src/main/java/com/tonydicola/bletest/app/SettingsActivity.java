@@ -23,6 +23,7 @@ import android.view.MenuItem;
 import android.support.v4.app.NavUtils;
 import android.view.View;
 import android.widget.Button;
+import android.widget.TextView;
 
 
 import java.util.List;
@@ -41,6 +42,8 @@ import java.util.List;
 public class SettingsActivity extends Activity {
 
     private static Button back_button;
+    private static TextView passcode_text;
+    private static String passcode;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,6 +54,21 @@ public class SettingsActivity extends Activity {
         //Init back button
         back_button = (Button) findViewById(R.id.settings_button);
         back_button.setOnClickListener(back_handler);
+        passcode_text = (TextView) findViewById(R.id.passcode);
+
+        SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(this);
+        passcode = sharedPref.getString("Passcode", "");
+        passcode_text.setText(passcode);
+
+        sharedPref.registerOnSharedPreferenceChangeListener(
+                new SharedPreferences.OnSharedPreferenceChangeListener() {
+                    public void onSharedPreferenceChanged(
+                            SharedPreferences prefs, String key) {
+                        passcode = prefs.getString(key, "");
+                        passcode_text.setText(passcode);
+                    }
+                }
+        );
     }
 
     //On click listener for back button

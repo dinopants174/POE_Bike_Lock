@@ -23,7 +23,7 @@ public class bletestapp extends AppWidgetProvider {
 
     @Override
     public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
-        Log.i("widget","onUpdate!");
+        //Log.i("widget","onUpdate!");
 
         // There may be multiple widgets active, so update all of them
         for (int appWidgetId : appWidgetIds) {

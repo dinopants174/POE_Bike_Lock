@@ -41,6 +41,6 @@
         android:id="@+id/settings_button"
         android:background="@drawable/settings"
         android:layout_alignParentTop="true"
-        android:layout_toEndOf="@+id/lock_state" />
+        android:layout_alignParentRight="true" />
 
 </RelativeLayout>

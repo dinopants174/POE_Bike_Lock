@@ -120,7 +120,19 @@ void loop()
     laststatus = status;
   }
   
-
+  if (status == ACI_EVT_DEVICE_STARTED){
+      for(pos = 40; pos < 60; pos += 1)  // goes from 0 degrees to 180 degrees 
+    {                                  // in steps of 1 degree 
+      servo.write(pos);              // tell servo to go to position in variable 'pos' 
+      delay(15);                       // waits 15ms for the servo to reach the position 
+    } 
+    for(pos = 60; pos>=40; pos-=1)     // goes from 180 degrees to 0 degrees 
+    {                                
+    servo.write(pos);              // tell servo to go to position in variable 'pos' 
+    delay(15);                       // waits 15ms for the servo to reach the position 
+    } 
+  }
+  
   if (status == ACI_EVT_CONNECTED) {
     if (call_response_start){
     while (BTLEserial.available()){  //call response protocol

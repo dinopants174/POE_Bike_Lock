@@ -21,15 +21,19 @@ byte eeprom_store = 0;
 boolean first_connection;
 boolean phone_secure = false;
 boolean call_response_start = true;
+boolean respond = true;
 
 Adafruit_BLE_UART BTLEserial = Adafruit_BLE_UART(ADAFRUITBLE_REQ, ADAFRUITBLE_RDY, ADAFRUITBLE_RST);
 
 Servo servo;
 int pos = 60;
-int desired_pos = 40;  //change this depending on where servo needs to go for unlock command
+int unlock_pos = 40;
+int lock_pos = 60;
+char t;
 
 String phone_str = "";
 int rssi_val = 0;
+unsigned long Timer;
 
 Average<int> rssi_vals(5);
 Average<int> diffs(5);
@@ -56,9 +60,9 @@ String prev_lock_state = "l";
 /**************************************************************************/
 void setup(void)
 { 
-  //Serial.begin(9600);
+  Serial.begin(9600);
   //while(!Serial); // Leonardo/Micro should wait for serial init
-  //Serial.println(F("Adafruit Bluefruit Low Energy nRF8001 Print echo demo"));
+  Serial.println(F("Adafruit Bluefruit Low Energy nRF8001 Print echo demo"));
 
   // BTLEserial.setDeviceName("NEWNAME"); /* 7 characters max! */
   BTLEserial.begin();
@@ -66,6 +70,8 @@ void setup(void)
   
   servo.write(pos);
   delay(15);
+  
+  Timer = millis();
   
   for (i=0; i<= 10; i++){
     rssi_vals.push(0);
@@ -76,11 +82,11 @@ void setup(void)
   if (value == 255){//default value in EEPROM right here right now
     //yo, I need to take the first thing the phone sends me after my first connection
     first_connection = true;
-    //Serial.println("Yo I am connecting for first time");
+    Serial.println("Yo I am connecting for first time");
   }
   else{
     first_connection = false; 
-    //Serial.println("Yo I am a connection veteran");
+    Serial.println("Yo I am a connection veteran");
   }
   
   //BTLEserial.print(prev_lock_state);
@@ -101,13 +107,13 @@ void loop()
   aci_evt_opcode_t status = BTLEserial.getState();
   if (status != laststatus) {
     if (status == ACI_EVT_DEVICE_STARTED) {
-        //Serial.println(F("* Advertising started"));
+        Serial.println(F("* Advertising started"));
     }
     if (status == ACI_EVT_CONNECTED) {
-        //Serial.println(F("* Connected!"));
+        Serial.println(F("* Connected!"));
     }
     if (status == ACI_EVT_DISCONNECTED) {
-        //Serial.println(F("* Disconnected or advertising timed out"));
+        Serial.println(F("* Disconnected or advertising timed out"));
         phone_secure = false;
         call_response_start = true;
         servo.write(60);
@@ -115,21 +121,61 @@ void loop()
     if (status == ACI_EVT_DEVICE_STARTED && laststatus == ACI_EVT_CONNECTED){
       phone_secure = false;
       call_response_start = true;
-      servo.write(60);
+      lock_state = "l";
     }
     laststatus = status;
   }
   
-
+  if (millis() - Timer > 15){
+          Serial.println(pos);
+            if (lock_state == "l"){
+                if(pos != lock_pos){
+                  pos += 1;
+                  Timer = millis();
+                  servo.write(pos);
+                  respond = true;
+                }
+                else if (respond){
+                  BTLEserial.print(lock_state);
+                  respond = false;
+                }
+              }
+            else if (lock_state == "u"){
+               if(pos != unlock_pos){
+                  pos -= 1;
+                  Timer = millis();
+                  servo.write(pos);
+                  respond = true;
+                }
+                else if(respond){
+                  BTLEserial.print(lock_state);
+                  respond = false;
+                }
+            }
+  } 
+  
+  //if (status == ACI_EVT_DEVICE_STARTED){
+      //for(pos = 40; pos < 60; pos += 1)  // goes from 0 degrees to 180 degrees 
+    //{                                  // in steps of 1 degree 
+      //servo.write(pos);              // tell servo to go to position in variable 'pos' 
+      //delay(15);                       // waits 15ms for the servo to reach the position 
+    //} 
+    //for(pos = 60; pos>=40; pos-=1)     // goes from 180 degrees to 0 degrees 
+    //{                                
+    //servo.write(pos);              // tell servo to go to position in variable 'pos' 
+    //delay(15);                       // waits 15ms for the servo to reach the position 
+    //} 
+  //}
+  
   if (status == ACI_EVT_CONNECTED) {
     if (call_response_start){
     while (BTLEserial.available()){  //call response protocol
       char c = BTLEserial.read();
-      //Serial.println(c);
-      //Serial.println("Austin has successfully sent me the character 'a'");
+      Serial.println(c);
+      Serial.println("Austin has successfully sent me the character 'a'");
       if (c == 'a'){
          BTLEserial.print("z");
-         //Serial.println("And I have responded to Austin with the character 'z'");
+         Serial.println("And I have responded to Austin with the character 'z'");
          call_response_start = false;
       }
      }
@@ -138,9 +184,9 @@ void loop()
     if (first_connection && !phone_secure && !call_response_start){ //take the passcode and store it in EEPROM
       while (BTLEserial.available()) {
          char c = BTLEserial.read();
-         //Serial.println(c);
+         Serial.println(c);
          if (c != ':'){
-           //Serial.println("I am writing the passcode to my EEPROM nnow");
+           Serial.println("I am writing the passcode to my EEPROM nnow");
            EEPROM.write(address, c - '0');
            address = address+1;
 //           if (address == 4){
@@ -148,7 +194,7 @@ void loop()
 //           }
          }
          else{
-           //Serial.println("Yo I have finished pairing and I am done writing to the EEPROM now. Phone is now secure.");
+           Serial.println("Yo I have finished pairing and I am done writing to the EEPROM now. Phone is now secure.");
            first_connection = false;
            phone_secure = true;
            BTLEserial.print("f");
@@ -162,12 +208,12 @@ void loop()
          char c = BTLEserial.read();
          if (c != ':'){
            phone_str += c;
-           //Serial.println(c);
+           Serial.println(c);
          }
          else{
            check = phone_str.toInt();  //this is the passcode the phone has sent me
-           //Serial.print("You sent me: ");
-           //Serial.println(check);
+           Serial.print("You sent me: ");
+           Serial.println(check);
            phone_str = "";
            address = 0;
            for (i=0; i<4; i++){
@@ -178,15 +224,15 @@ void loop()
            
            passcode = phone_str.toInt();
            phone_str = "";
-           //Serial.print("The passcode in my memory is: ");
-           //Serial.println(passcode);
+           Serial.print("The passcode in my memory is: ");
+           Serial.println(passcode);
            if (check == passcode){
-             //Serial.println("Fabulous, this is the phone I should give lock control too");
+             Serial.println("Fabulous, this is the phone I should give lock control too");
              phone_secure = true;
              BTLEserial.print("f");
            }
            else{
-             //Serial.println("GET THE FUCK OUT BITCH THIS AINT YO LOCK");
+             Serial.println("GET THE FUCK OUT BITCH THIS AINT YO LOCK");
              phone_secure = false;
              call_response_start = true;
              BTLEserial.print("d");
@@ -200,13 +246,13 @@ void loop()
     while (BTLEserial.available()) {
       char c = BTLEserial.read();
       if (c == 'u'){ 
-        //Serial.println("I am unlocking becuase of app input");
-        pos = desired_pos;
+        Serial.println("I am unlocking becuase of app input");
+        //pos = unlock_pos;
         lock_state = "u";
         }
       else if (c == 'l'){ 
-        //Serial.println("I am locking because of app input");
-        pos = 60;
+        Serial.println("I am locking because of app input");
+        //pos = lock_pos;
         lock_state = "l";
         }
       else{
@@ -251,32 +297,21 @@ void loop()
        }
                       
        if (current_rssi_avg <= rssi_lock_val && avg_diff < 0){
-             //Serial.println("I am locking because of RSSI");
-             pos = 60;
+             Serial.println("I am locking because of RSSI");
+             //pos = lock_pos;
              lock_state = "l";
           }
             
           else if (current_rssi_avg >= rssi_unlock_val && avg_diff > 0){
-              //Serial.println("I am unlocking because of RSSI"); 
-              pos = desired_pos;
+              Serial.println("I am unlocking because of RSSI"); 
+              //pos = unlock_pos;
               lock_state = "u";
            }
         
       }
-          //lock_state = "l";  
-          servo.write(pos);
-          delay(15);
-        
-       }
+          //lock_state = "l";
+     }
        
-     if (lock_state != prev_lock_state){
-       if (lock_state == ""){
-         lock_state = "l";
-         prev_lock_state = "l";
-         BTLEserial.print(lock_state);
-        }
-        else{
-          BTLEserial.print(lock_state);
           //BTLEserial.print(";");
 //          Serial.println("");
 //          Serial.print("I think the lock is currently: ");
@@ -285,12 +320,10 @@ void loop()
 //          Serial.println("--------------------------------");     
 
 //          Serial.println("");
-          //Serial.print(";");
-          prev_lock_state = lock_state;   
-        }
+         
     }
    }
-   else{}
-  }
 }
+   
+   
 

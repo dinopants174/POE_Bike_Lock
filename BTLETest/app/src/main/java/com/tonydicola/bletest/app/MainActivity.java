@@ -53,6 +53,10 @@ public class MainActivity extends Activity {
     private Boolean call = true;
     private TimerTask call_task;
 
+    private Timer call_timer_timeout;
+    private boolean call_timeout = true;
+    private TimerTask call_timeout_task;
+
     // UI elements
     private static ToggleButton lock_toggle;
     private static ToggleButton mode_toggle; //for auto-mode on/off
@@ -166,6 +170,12 @@ public class MainActivity extends Activity {
                 call_timer.purge();
                 call = true;
             }
+            if (call_timer_timeout != null) {
+                call_timeout_task.cancel();
+                call_timer_timeout.cancel();
+                call_timer_timeout.purge();
+                call_timeout = true;
+            }
         }
     }
 
@@ -199,6 +209,12 @@ public class MainActivity extends Activity {
                                 call_timer.cancel();
                                 call_timer.purge();
                             }
+                            if (call_timer_timeout != null) {
+                                call_timeout_task.cancel();
+                                call_timer_timeout.cancel();
+                                call_timer_timeout.purge();
+                                call_timeout = true;
+                            }
                             call_task = new TimerTask() {
                                 @Override
                                 public void run() {
@@ -208,6 +224,42 @@ public class MainActivity extends Activity {
                             call_timer = new Timer();
                             call_timer.schedule(call_task, 0, 1000);
                             call = false;
+
+                            call_timeout_task = new TimerTask() {
+                                @Override
+                                public void run() {
+                                    Log.i("timeout", "BOOOOOOOOOOM");
+                                    if (call_timer != null) {
+                                        call_task.cancel();
+                                        call_timer.cancel();
+                                        call_timer.purge();
+                                        call = true;
+                                    }
+                                    if (call_timer_timeout != null) {
+                                        call_timeout_task.cancel();
+                                        call_timer_timeout.cancel();
+                                        call_timer_timeout.purge();
+                                        call_timeout = true;
+                                    }
+
+                                    if(gatt != null) {
+                                        gatt.disconnect();
+                                        gatt.close();
+                                        gatt = null;
+                                        tx = null;
+                                        rx = null;
+                                    }
+
+                                    ble_state = "disconnected";
+                                    changeColor(ble_state);
+
+                                    adapter.startLeScan(scanCallback);
+                                }
+                            };
+
+                            call_timer_timeout = new Timer();
+                            call_timer.schedule(call_timeout_task, 10000);
+                            call_timeout = false;
                             Log.i("Call Response Protocol", "Sending Call");
                         }
 
@@ -244,6 +296,10 @@ public class MainActivity extends Activity {
                         tx = null;
                         rx = null;
                     }
+
+                    ble_state = "disconnected";
+                    changeColor(ble_state);
+
                     //Start new scan
                     Log.i("ble Connect", "Scanning");
                     adapter.startLeScan(scanCallback);
@@ -444,12 +500,10 @@ public class MainActivity extends Activity {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                if (lock_toggle.isChecked() != locked){
-                    lock_toggle.setChecked(locked);
-                    //Vibrate
-                    Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-                    v.vibrate(500);
-                }
+                lock_toggle.setChecked(locked);
+                //Vibrate
+                Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+                v.vibrate(500);
             }
         });
     }
@@ -460,7 +514,7 @@ public class MainActivity extends Activity {
         if (called_by_widget) {
             lock_toggle.setChecked(!lock_toggle.isChecked());
         }
-        boolean locked = !lock_toggle.isChecked();
+        boolean locked = lock_toggle.isChecked();
 
         //Send toggle commands to the arduino
         if(tx != null) {
@@ -526,6 +580,12 @@ public class MainActivity extends Activity {
             call_timer.purge();
             call = true;
         }
+        if (call_timer_timeout != null) {
+            call_timeout_task.cancel();
+            call_timer_timeout.cancel();
+            call_timer_timeout.purge();
+            call_timeout = true;
+        }
         //Send passcode
         sendPasscode();
     }
@@ -577,6 +637,12 @@ public class MainActivity extends Activity {
                 call_timer.cancel();
                 call_timer.purge();
                 call = true;
+            }
+            if (call_timer_timeout != null) {
+                call_timeout_task.cancel();
+                call_timer_timeout.cancel();
+                call_timer_timeout.purge();
+                call_timeout = true;
             }
         }
         adapter.startLeScan(scanCallback);
